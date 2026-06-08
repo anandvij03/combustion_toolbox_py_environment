@@ -530,3 +530,985 @@ class Mixture:
             
         return self
 
+    def setProperties(self, property_name, value, *args):
+        """
+        Obtain properties at equilibrium for the given thermochemical transformation
+        """
+        import copy
+        
+        FLAG_MACH = False
+        FLAG_ENTROPY = False
+        FLAG_ENTHALPY = False
+        FLAG_INTERNAL_ENERGY = False
+
+        properties = [property_name]
+        values = [value]
+        
+        for i in range(0, len(args), 2):
+            properties.append(args[i])
+            values.append(args[i+1])
+
+        # Reorder if equivalence ratio is not the first property
+        index = -1
+        for i, prop in enumerate(properties):
+            if prop.lower() in ['equivalenceratio', 'phi']:
+                index = i
+                break
+                
+        if index != -1 and index != 0:
+            properties.insert(0, properties.pop(index))
+            values.insert(0, values.pop(index))
+            
+        numProperties = min(len(properties), len(values))
+
+        # Check vectors
+        FLAG_VECTOR = [isinstance(v, (list, tuple, np.ndarray)) and len(np.atleast_1d(v)) > 1 for v in values]
+        
+        if any(FLAG_VECTOR):
+            FLAG_VECTOR_FIRST = FLAG_VECTOR.index(True)
+            aux = np.ones(len(values[FLAG_VECTOR_FIRST]))
+            
+            for i, is_vec in enumerate(FLAG_VECTOR):
+                if not is_vec:
+                    values[i] = np.array(values[i]) * aux
+                    
+            self.rangeName = properties[FLAG_VECTOR_FIRST]
+            
+            valid_range_names = ['t', 'p', 'vspecific', 'phi', 'u', 'mach', 'beta', 'theta', 'drive_factor', 'aratio', 'aratio_c', 'compressibility']
+            if self.rangeName.lower() not in valid_range_names:
+                rn_lower = self.rangeName.lower()
+                if rn_lower == 'temperature': self.rangeName = 'T'
+                elif rn_lower == 'pressure': self.rangeName = 'p'
+                elif rn_lower in ['volume', 'v']: self.rangeName = 'vSpecific'
+                elif rn_lower == 'phi': self.rangeName = 'equivalenceRatio'
+                elif rn_lower in ['velocity', 'u1']: self.rangeName = 'u'
+                elif rn_lower == 'm1': self.rangeName = 'mach'
+                elif rn_lower in ['wave angle', 'waveangle', 'wave']: self.rangeName = 'beta'
+                elif rn_lower in ['deflection angle', 'deflectionangle', 'deflection']: self.rangeName = 'theta'
+                elif rn_lower == 'drive_factor': self.rangeName = 'driveFactor'
+                elif rn_lower == 'aratio': self.rangeName = 'areaRatio'
+                elif rn_lower == 'aratio_c': self.rangeName = 'areaRatioChamber'
+                elif rn_lower == 'compressibility': self.rangeName = 'eta'
+        else:
+            FLAG_VECTOR_FIRST = 0
+            values = [np.atleast_1d(v) for v in values]
+
+        numCases = len(values[FLAG_VECTOR_FIRST])
+        
+        objArray = []
+
+        for j in range(numCases):
+            obj_copy = copy.copy(self)
+            
+            for i in range(numProperties):
+                prop_lower = properties[i].lower()
+                val = values[i][j]
+                
+                if prop_lower in ['temperature', 't']:
+                    obj_copy.T = val
+                elif prop_lower in ['pressure', 'p']:
+                    obj_copy.p = val
+                    obj_copy._FLAG_VOLUME = False
+                elif prop_lower in ['volume', 'vspecific', 'v']:
+                    obj_copy.vSpecific = val
+                    obj_copy._FLAG_VOLUME = True
+                elif prop_lower in ['entropy', 's', 's0']:
+                    obj_copy.s = val
+                    FLAG_ENTROPY = True
+                elif prop_lower in ['entropyspecific', 'sspecific', 'smass']:
+                    obj_copy.s = val * obj_copy.mi
+                    FLAG_ENTROPY = True
+                elif prop_lower in ['enthalpy', 'h', 'h0']:
+                    obj_copy.h = val
+                    FLAG_ENTHALPY = True
+                elif prop_lower in ['enthalpyspecific', 'hspecific', 'hmass']:
+                    obj_copy.h = val * obj_copy.mi
+                    FLAG_ENTHALPY = True
+                elif prop_lower in ['internalenergy', 'e', 'e0']:
+                    obj_copy.e = val
+                    FLAG_INTERNAL_ENERGY = True
+                elif prop_lower in ['internalenergyspecific', 'especific', 'emass']:
+                    obj_copy.e = val * obj_copy.mi
+                    FLAG_INTERNAL_ENERGY = True
+                elif prop_lower in ['equivalenceratio', 'phi']:
+                    obj_copy.equivalenceRatio = val
+                    obj_copy.updateComposition()
+                elif prop_lower in ['velocity', 'u', 'u1']:
+                    obj_copy.u = val
+                elif prop_lower in ['mach', 'm1']:
+                    obj_copy.mach = val
+                    obj_copy.u = None
+                    FLAG_MACH = True
+                elif prop_lower in ['wave angle', 'waveangle', 'wave', 'beta']:
+                    obj_copy.beta = val
+                elif prop_lower in ['deflection angle', 'deflectionangle', 'deflection', 'theta']:
+                    obj_copy.theta = val
+                elif prop_lower in ['drive_factor', 'drivefactor']:
+                    obj_copy.driveFactor = val
+                elif prop_lower in ['arearatio', 'aratio']:
+                    obj_copy.areaRatio = val
+                elif prop_lower in ['arearatiochamber', 'aratio_c']:
+                    obj_copy.areaRatioChamber = val
+                elif prop_lower in ['compressibility', 'eta']:
+                    obj_copy.eta = val
+                elif prop_lower == 'chi':
+                    obj_copy.chi = val
+                elif prop_lower == 'etavorticity':
+                    obj_copy.etaVorticity = val
+                else:
+                    raise ValueError(f'Property not found: {properties[i]}')
+
+            if FLAG_ENTROPY:
+                obj_copy.setEntropy(obj_copy.s)
+            elif FLAG_ENTHALPY:
+                obj_copy.setEnthalpy(obj_copy.h)
+            elif FLAG_INTERNAL_ENERGY:
+                obj_copy.setInternalEnergy(obj_copy.e)
+            else:
+                obj_copy.updateThermodynamics()
+
+            if FLAG_MACH:
+                obj_copy.u = obj_copy.mach * obj_copy.sound
+
+            objArray.append(obj_copy)
+
+        return objArray
+
+    def updateThermodynamics(self):
+        """
+        Update the thermodynamic state of the mixture
+        """
+        if not self.T or (not self.p and not self.vSpecific):
+            return self
+
+        currentMoles = self._systemMoles
+
+        if currentMoles is not None and np.sum(currentMoles) > 0:
+            self._systemMoles = currentMoles
+        elif np.sum(self.quantity):
+            self._systemMoles = self.buildSystemMoles(self.listSpecies, self.quantity, self._indexSpecies)
+        else:
+            return self
+
+        self.computeComposition()
+        self.computeThermodynamics()
+        return self
+
+    def updateComposition(self):
+        """
+        Update the composition of the mixture
+        """
+        if not np.sum(self.quantity):
+            return self
+
+        if self.FLAG_FUEL and self.FLAG_OXIDIZER:
+            self.chemicalSystem.setOxidizerReference(self.listSpeciesOxidizer)
+            
+            self.defineF()
+            
+            if self.equivalenceRatio is not None:
+                if self.ratioOxidizer is None:
+                    self.ratioOxidizer = list(self.molesOxidizer)
+                self.molesOxidizer = self.stoichiometricMoles / self.equivalenceRatio * np.array(self.ratioOxidizer)
+
+            self.defineO()
+            
+            self.quantity = []
+            if self.molesFuel is not None: self.quantity.extend(self.molesFuel)
+            if self.molesOxidizer is not None: self.quantity.extend(self.molesOxidizer)
+            if self.molesInert is not None: self.quantity.extend(self.molesInert)
+
+        self.mergeDuplicateSpecies()
+
+        self._systemMoles = self.buildSystemMoles(self.listSpecies, self.quantity, self._indexSpecies)
+
+        self.computeComposition()
+        self.computeEquivalenceRatio()
+
+        self._indexProducts = self.getIndexProducts()
+        self._productSpeciesSet = self.getProductSpeciesSet(self._indexProducts)
+        
+        return self
+
+    def updateIndexSpecies(self):
+        """
+        Update index species in the mixture
+        """
+        from combustiontoolbox.utils.findIndex import findIndex
+        self._indexSpecies = findIndex(self.chemicalSystem.listSpecies, self.listSpecies)
+        return self
+
+    def vSpecific2vMolar(self, vSpecific, moles, molesGas, index=None):
+        """
+        Compute molar volume [m3/mol] from specific volume [m3/kg]
+        """
+        if index is None:
+            from combustiontoolbox.utils.findIndex import findIndex
+            index = findIndex(self.chemicalSystem.listSpecies, self.listSpecies)
+            
+        MW = self.computeMeanMolecularWeight(moles, index)
+        
+        W = MW * np.sum(moles) / np.sum(molesGas)
+        
+        vMolar = vSpecific * W
+        return vMolar
+
+    def getTypeSpecies(self):
+        """
+        Create cell array with the type of species in the mixture
+        """
+        typeFuel = ['Fuel'] * len(self.listSpeciesFuel) if self.listSpeciesFuel else []
+        typeOxidizer = ['Oxidizer'] * len(self.listSpeciesOxidizer) if self.listSpeciesOxidizer else []
+        typeInert = ['Inert'] * len(self.listSpeciesInert) if self.listSpeciesInert else []
+        
+        return typeInert + typeOxidizer + typeFuel
+
+    def getNumberDensity(self):
+        """
+        Compute total number density of the mixture
+        """
+        from combustiontoolbox.common.Constants import Constants
+        NA = Constants.NA
+        KB = Constants.KB
+        pressure = self.p
+
+        numberDensity = pressure / (KB * self.T) * 1e5
+        return numberDensity
+
+    def getSpeciesNumberDensity(self):
+        """
+        Compute species number density of the mixture
+        """
+        Xi = np.array(self.Xi) if self.Xi is not None else np.array([])
+        numberDensity = self.getNumberDensity()
+        
+        speciesNumberDensity = Xi * numberDensity
+        return speciesNumberDensity, numberDensity
+
+    def getNeutralNumberDensity(self):
+        """
+        Compute neutral number density of the mixture
+        """
+        isIonized = np.array(self.chemicalSystem.isIonized)
+        speciesNumberDensity, _ = self.getSpeciesNumberDensity()
+        
+        if len(speciesNumberDensity) == 0:
+            return 0
+            
+        neutralNumberDensity = np.sum(speciesNumberDensity[~isIonized])
+        return neutralNumberDensity
+
+    def getElectronNumberDensity(self):
+        """
+        Compute electron number density of the mixture
+        """
+        from combustiontoolbox.utils.findIndex import findIndex
+        indexElectron = findIndex(self.chemicalSystem.listSpecies, 'eminus')
+        
+        if indexElectron is None or (isinstance(indexElectron, list) and len(indexElectron) == 0):
+            return 0
+            
+        speciesNumberDensity, _ = self.getSpeciesNumberDensity()
+        idx = indexElectron[0] if isinstance(indexElectron, list) else indexElectron
+        
+        return speciesNumberDensity[idx]
+
+    def getIonNumberDensity(self):
+        """
+        Compute ion number density of the mixture of charged heavy species (ions) excluding electrons
+        """
+        from combustiontoolbox.utils.findIndex import findIndex
+        indexElectron = findIndex(self.chemicalSystem.listSpecies, 'eminus')
+        
+        if indexElectron is None or (isinstance(indexElectron, list) and len(indexElectron) == 0):
+            return 0
+            
+        speciesNumberDensity, _ = self.getSpeciesNumberDensity()
+        charges = np.array(self.chemicalSystem.getCharges())
+        
+        idx = indexElectron[0] if isinstance(indexElectron, list) else indexElectron
+        electronNumberDensity = speciesNumberDensity[idx]
+        
+        ionNumberDensity = abs(np.sum(charges * speciesNumberDensity) - electronNumberDensity)
+        return ionNumberDensity
+
+    def getDegreeIonization(self):
+        """
+        Compute degree of ionization of the mixture
+        """
+        neutralNumberDensity = self.getNeutralNumberDensity()
+        electronNumberDensity = self.getElectronNumberDensity()
+        
+        if (electronNumberDensity + neutralNumberDensity) == 0:
+            return 0
+            
+        degreeIonization = electronNumberDensity / (electronNumberDensity + neutralNumberDensity)
+        return degreeIonization
+
+    def getDebyeLength(self):
+        """
+        Compute Debye length of the mixture
+        """
+        from combustiontoolbox.common.Constants import Constants
+        import math
+        
+        epsilon0 = Constants.E0
+        kB = Constants.KB
+        e = Constants.E
+        T = self.T
+        electronNumberDensity = self.getElectronNumberDensity()
+        
+        if electronNumberDensity == 0:
+            return float('inf')
+            
+        debyeLength = math.sqrt(epsilon0 * kB * T / (electronNumberDensity * e**2))
+        return debyeLength
+
+    def getElectronsDebyeSphere(self):
+        """
+        Compute number of electrons in Debye sphere
+        """
+        import math
+        debyeLength = self.getDebyeLength()
+        electronNumberDensity = self.getElectronNumberDensity()
+
+        electronsDebyeSphere = 4 / 3 * math.pi * electronNumberDensity * debyeLength**3
+        return electronsDebyeSphere
+
+    def getPlasmaCoupling(self):
+        """
+        Compute the plasma coupling parameter of the mixture
+        """
+        from combustiontoolbox.common.Constants import Constants
+        import math
+        
+        charges = np.array(self.chemicalSystem.getCharges())
+        epsilon0 = Constants.E0
+        electronNumberDensity = self.getElectronNumberDensity()
+        speciesNumberDensity, _ = self.getSpeciesNumberDensity()
+        kb = Constants.KB
+        e = Constants.E
+        T = self.T
+
+        if electronNumberDensity == 0:
+            return 0.0, np.zeros_like(charges)
+
+        # Compute average inter-particle distance [m]
+        distance = (3 / (4 * math.pi * electronNumberDensity))**(1/3)
+        
+        # Compute plasma coupling electron [-]
+        plasmaCouplingElectron = e**2 / (4 * math.pi * epsilon0 * distance * kb * T)
+
+        # Compute plasma coupling species [-]
+        plasmaCouplingSpecies = plasmaCouplingElectron * np.abs(charges)**(5/3)
+
+        sum_species = np.sum(speciesNumberDensity)
+        if sum_species == 0:
+            chargesAverage = 0
+        else:
+            # Compute average charge of ions
+            chargesAverage = math.sqrt(np.sum(np.abs(charges)**(5/3) * speciesNumberDensity) / sum_species)
+
+        # Compute plasma coupling [-]
+        plasmaCoupling = plasmaCouplingElectron * chargesAverage
+        
+        return plasmaCoupling, plasmaCouplingSpecies
+
+    def isWeaklyCoupledPlasma(self):
+        """
+        Check if the mixture is weakly coupled plasma
+        """
+        plasmaCoupling, _ = self.getPlasmaCoupling()
+        value = plasmaCoupling < 0.2
+        return value, plasmaCoupling
+
+    # Private/Hidden Methods
+
+    def buildSystemMoles(self, listSpecies, quantity, index=None):
+        """
+        Build a full composition vector in ChemicalSystem species order
+        """
+        system = self.chemicalSystem
+        moles = np.zeros(system.numSpecies)
+
+        if not listSpecies or not quantity:
+            return moles
+
+        if index is None:
+            from combustiontoolbox.utils.findIndex import findIndex
+            index = findIndex(system.listSpecies, listSpecies)
+
+        quantity = np.array(quantity).flatten()
+        index = np.array(index).flatten()
+        
+        # Adjust to 0-based index if index returned 1-based, assuming Python port has 0-based
+        # If it returns 0-based, we can just use it directly
+        for i in range(len(index)):
+            idx = int(index[i])
+            moles[idx] = moles[idx] + quantity[i]
+            
+        return moles
+
+    def getIndexProducts(self):
+        """
+        Get product species indices in ChemicalSystem order
+        """
+        from combustiontoolbox.utils.findIndex import findIndex
+        
+        system = self.chemicalSystem
+        listProducts = system.listProducts
+
+        if system.FLAG_COMPLETE and self.equivalenceRatio is not None:
+            equivalenceRatioSoot = self.equivalenceRatioSoot
+            if equivalenceRatioSoot is None:
+                equivalenceRatioSoot = float('inf')
+
+            if self.equivalenceRatio < 1:
+                listProducts = system.listSpeciesLean
+            elif self.equivalenceRatio <= equivalenceRatioSoot:
+                listProducts = system.listSpeciesRich
+            else:
+                listProducts = system.listSpeciesSoot
+
+        if not listProducts:
+            raise ValueError('Product species list cannot be empty')
+
+        indexProducts = findIndex(system.listSpecies, listProducts)
+        if len(indexProducts) != len(listProducts):
+            raise ValueError('Product species must be included in ChemicalSystem')
+
+        indexProducts = np.array(indexProducts)
+        indexGas = np.array(system.indexGas)
+        indexCondensed = np.array(system.indexCondensed)
+        
+        gas_mask = np.isin(indexGas, indexProducts)
+        cond_mask = np.isin(indexCondensed, indexProducts)
+        
+        return np.concatenate((indexGas[gas_mask], indexCondensed[cond_mask]))
+
+    def getProductSpeciesSet(self, indexProducts):
+        """
+        Get product species set with ChemicalSystem data and solver-local indices
+        """
+        system = self.chemicalSystem
+        indexProducts = np.array(indexProducts).flatten()
+        
+        # Using integer arrays to index directly
+        phase = np.array(system.phase)[indexProducts]
+
+        productSpeciesSet = type('ProductSpeciesSet', (), {})()
+        productSpeciesSet.indexGlobal = indexProducts
+        productSpeciesSet.stoichiometricMatrix = np.array(system.stoichiometricMatrix)[indexProducts, :]
+        productSpeciesSet.molecularWeight = np.array(system.molecularWeight)[indexProducts]
+        productSpeciesSet.phase = phase
+        productSpeciesSet.temperatureMin = np.array(system.temperatureMin)[indexProducts]
+        productSpeciesSet.temperatureMax = np.array(system.temperatureMax)[indexProducts]
+        productSpeciesSet.numSpecies = len(indexProducts)
+        
+        productSpeciesSet.indexGas = np.where(~phase)[0]
+        productSpeciesSet.indexCondensed = np.where(phase)[0]
+        
+        # Note: system.indexCryogenic may be a list/array
+        sys_cryo = np.array(system.indexCryogenic)
+        productSpeciesSet.indexCryogenic = np.where(np.isin(indexProducts, sys_cryo))[0]
+        
+        sys_ions = np.array(system.indexIons)
+        productSpeciesSet.indexIons = np.where(np.isin(indexProducts, sys_ions))[0]
+        
+        productSpeciesSet.indexSpecies = np.concatenate((productSpeciesSet.indexGas, productSpeciesSet.indexCondensed))
+        
+        return productSpeciesSet
+
+    def computeProperties(self, *args):
+        """
+        Compute composition and thermodynamic properties of the mixture
+        """
+        self.computeComposition()
+        self.computeThermodynamics(*args)
+        return self
+
+    def computeComposition(self):
+        """
+        Compute the composition of the mixture
+        """
+        system = self.chemicalSystem
+        Ni = np.array(self._systemMoles)
+        molecularWeight = np.array(system.molecularWeight)
+
+        self.N = np.sum(Ni)
+        self.phase = np.array(system.phase)
+
+        N_gas = np.sum(Ni[~self.phase])
+        
+        if self.N > 0:
+            self.Xi = Ni / self.N
+        else:
+            self.Xi = np.zeros_like(Ni)
+
+        if N_gas > 0:
+            self.W = np.dot(Ni, molecularWeight) / N_gas
+        else:
+            self.W = 0
+            
+        if self.N > 0:
+            self.MW = np.dot(Ni, molecularWeight) / self.N
+        else:
+            self.MW = 0
+
+        self.mi = self.MW * self.N
+
+        if self.mi > 0:
+            self.Yi = (Ni * molecularWeight) / self.mi
+        else:
+            self.Yi = np.zeros_like(Ni)
+
+        self.natomElements = np.sum(Ni[:, np.newaxis] * np.array(system.stoichiometricMatrix), axis=0)
+
+        # Compute vector atoms without frozen species
+        indexReact = np.array(system.indexReact)
+        if len(indexReact) > 0:
+            st_mat_react = np.array(system.stoichiometricMatrix)[indexReact, :]
+            self.natomElementsReact = np.sum(Ni[indexReact][:, np.newaxis] * st_mat_react, axis=0)
+        else:
+            self.natomElementsReact = np.zeros(np.array(system.stoichiometricMatrix).shape[1])
+
+    def computeThermodynamics(self, speciesEnthalpy=None, speciesEnthalpyIndex=None):
+        """
+        Compute thermodynamic properties of the mixture
+        """
+        from combustiontoolbox.common.Units import Units
+        from combustiontoolbox.common.Constants import Constants
+        import math
+        
+        if getattr(self, 'FLAG_TSPECIES', False):
+            self.setTemperatureSpecies(self.Tspecies)
+            self.Tspecies = []
+            self.FLAG_TSPECIES = False
+
+        temperature = self.T
+        pressure = self.p
+        if pressure is not None:
+            pressure_Pa = pressure * Units.bar2Pa
+        else:
+            pressure_Pa = None
+            
+        R0 = Constants.R0
+        system = self.chemicalSystem
+        Ni = np.array(self._systemMoles)
+
+        active = np.where(Ni > 0)[0]
+        h0 = np.zeros(system.numSpecies)
+        cp0 = np.zeros(system.numSpecies)
+        s0 = np.zeros(system.numSpecies)
+        
+        FLAG_SPECIES_ENTHALPY = speciesEnthalpy is not None
+        FLAG_ALL_ACTIVE_ENTHALPY = False
+
+        if FLAG_SPECIES_ENTHALPY:
+            speciesEnthalpy = np.array(speciesEnthalpy).flatten()
+
+            if speciesEnthalpyIndex is not None:
+                speciesEnthalpyIndex = np.array(speciesEnthalpyIndex).flatten()
+                
+                if len(speciesEnthalpy) == system.numSpecies:
+                    h0[speciesEnthalpyIndex] = speciesEnthalpy[speciesEnthalpyIndex]
+                elif len(speciesEnthalpy) == len(speciesEnthalpyIndex):
+                    h0[speciesEnthalpyIndex] = speciesEnthalpy
+                else:
+                    raise ValueError('speciesEnthalpy must match ChemicalSystem species or speciesEnthalpyIndex length.')
+
+                if len(active) == 0 or np.array_equal(np.sort(speciesEnthalpyIndex), np.sort(active)) or np.all(np.isin(active, speciesEnthalpyIndex)):
+                    FLAG_ALL_ACTIVE_ENTHALPY = True
+            else:
+                if len(speciesEnthalpy) != system.numSpecies:
+                    raise ValueError('speciesEnthalpy must have one entry per ChemicalSystem species when speciesEnthalpyIndex is omitted.')
+                h0 = speciesEnthalpy
+                speciesEnthalpyIndex = []
+                FLAG_ALL_ACTIVE_ENTHALPY = True
+
+        if len(active) > 0 and FLAG_ALL_ACTIVE_ENTHALPY:
+            cpActive, sActive = system.evaluateSpeciesThermoCPS(temperature, active)
+            cp0[active] = cpActive[:, 0] if cpActive.ndim > 1 else cpActive
+            s0[active] = sActive[:, 0] if sActive.ndim > 1 else sActive
+        elif len(active) > 0 and FLAG_SPECIES_ENTHALPY:
+            speciesEnthalpyMask = np.zeros(system.numSpecies, dtype=bool)
+            if speciesEnthalpyIndex is not None and len(speciesEnthalpyIndex) > 0:
+                speciesEnthalpyMask[speciesEnthalpyIndex] = True
+            
+            cpActive, sActive = system.evaluateSpeciesThermoCPS(temperature, active)
+            cp0[active] = cpActive[:, 0] if cpActive.ndim > 1 else cpActive
+            s0[active] = sActive[:, 0] if sActive.ndim > 1 else sActive
+            
+            activePendingEnthalpy = active[~speciesEnthalpyMask[active]]
+            if len(activePendingEnthalpy) > 0:
+                hActive = system.evaluateSpeciesThermoH(temperature, activePendingEnthalpy)
+                h0[activePendingEnthalpy] = hActive[:, 0] if hActive.ndim > 1 else hActive
+        elif len(active) > 0:
+            hActive, cpActive, sActive = system.evaluateSpeciesThermoHCPS(temperature, active)
+            h0[active] = hActive[:, 0] if hActive.ndim > 1 else hActive
+            cp0[active] = cpActive[:, 0] if cpActive.ndim > 1 else cpActive
+            s0[active] = sActive[:, 0] if sActive.ndim > 1 else sActive
+
+        self.hf = np.dot(system.formationEnthalpy, Ni)
+        self.h = np.dot(h0, Ni)
+        self.ef = np.dot(system.formationInternalEnergy, Ni)
+        self.cp = np.dot(cp0, Ni)
+        self.s0_val = np.dot(s0, Ni) # s0 property used as s0_val avoiding conflict with property s
+
+        N_gas = np.sum(Ni[~self.phase])
+        FLAG_NONZERO = self.Xi > 0
+
+        if self._FLAG_VOLUME:
+            self.v = self.vSpecific * self.mi
+            vMolar = self.v / N_gas if N_gas > 0 else 0
+            self.p = self.equationState.getPressure(temperature, vMolar, self.Xi, self.chemicalSystem) * Units.Pa2bar
+            pressure_Pa = self.p * Units.bar2Pa
+        else:
+            if pressure_Pa is not None:
+                vMolar = self.equationState.getVolume(temperature, pressure_Pa, self.Xi, self.chemicalSystem)
+                self.v = vMolar * N_gas
+            else:
+                self.v = None
+                vMolar = None
+
+        if self.mi > 0 and self.v is not None:
+            self.vSpecific = self.v / self.mi
+            self.rho = 1 / self.vSpecific
+        else:
+            self.vSpecific = None
+            self.rho = None
+
+        if pressure_Pa is not None and vMolar is not None:
+            cp_dep_molar, h_dep_molar, s_dep_molar = self.equationState.getDepartureFunctions(
+                temperature, pressure_Pa, vMolar, self.Xi, self.chemicalSystem)
+
+            self.cp = self.cp + cp_dep_molar * N_gas
+            self.h = self.h + h_dep_molar * N_gas
+            self.s0_val = self.s0_val + s_dep_molar * N_gas
+            
+            self.e = self.h - pressure_Pa * self.v
+        else:
+            self.e = None
+
+        if self.e is not None:
+            self.DeT = self.e - self.ef
+        else:
+            self.DeT = None
+            
+        self.DhT = self.h - self.hf
+
+        self.Ds = self.computeEntropyMixing(Ni, N_gas, R0, FLAG_NONZERO)
+
+        self.s = self.s0_val + self.Ds
+        
+        if self.s is not None and temperature is not None:
+            self.g = self.h - temperature * self.s
+        else:
+            self.g = None
+
+        if pressure_Pa is not None and vMolar is not None:
+            dVdT_p_frozen, dVdp_T_frozen = self.equationState.getVolumeDerivatives(
+                temperature, pressure_Pa, vMolar, self.Xi, self.chemicalSystem)
+        else:
+            dVdT_p_frozen, dVdp_T_frozen = 0.0, 0.0
+
+        self.cp_f = self.cp
+        if temperature is not None and pressure_Pa is not None and self.v is not None and dVdp_T_frozen != 0:
+            self.cv_f = self.cp_f + (pressure_Pa * self.v / temperature) * (dVdT_p_frozen**2) / dVdp_T_frozen
+        else:
+            self.cv_f = None
+
+        if getattr(self, 'FLAG_REACTION', False):
+            self.dVdT_p = getattr(self, 'dN_T', 0) + dVdT_p_frozen
+            self.dVdp_T = getattr(self, 'dN_p', 0) + dVdp_T_frozen
+
+            if hasattr(self, 'dNi_T') and self.dNi_T is not None and not np.any(np.isnan(self.dNi_T)) and not np.any(np.isinf(self.dNi_T)):
+                delta = ~self.phase
+                h0_j = h0
+                
+                term = h0_j / temperature * (1 + delta * (Ni - 1)) * self.dNi_T
+                self.cp = self.cp_f + np.nansum(term)
+                
+                if self.dVdp_T != 0:
+                    self.cv = self.cp + (pressure_Pa * self.v / temperature) * (self.dVdT_p**2) / self.dVdp_T
+                else:
+                    self.cv = None
+                    
+                if self.cv and self.cv != 0:
+                    self.gamma = self.cp / self.cv
+                else:
+                    self.gamma = None
+                    
+                if self.dVdp_T != 0:
+                    self.gamma_s = -self.gamma / self.dVdp_T if self.gamma is not None else None
+                else:
+                    self.gamma_s = None
+
+                if self.gamma_s is not None and self.gamma_s >= 0:
+                    self.sound = math.sqrt(self.gamma_s * pressure_Pa * self.vSpecific)
+                else:
+                    self.sound = None
+
+                if self.u is not None and self.sound is not None and self.sound > 0:
+                    self.mach = self.u / self.sound
+
+                return self
+
+            if self.dVdp_T != 0:
+                self.gamma_s = -1 / self.dVdp_T
+            else:
+                self.gamma_s = None
+                
+            return self
+
+        self.dVdT_p = dVdT_p_frozen
+        self.dVdp_T = dVdp_T_frozen
+        self.cv = self.cv_f
+
+        if self.cv and self.cv != 0:
+            self.gamma = self.cp / self.cv
+        else:
+            self.gamma = None
+            
+        if self.dVdp_T != 0 and self.gamma is not None:
+            self.gamma_s = -self.gamma / self.dVdp_T
+        else:
+            self.gamma_s = None
+
+        if self.gamma_s is not None and pressure_Pa is not None and self.vSpecific is not None and self.gamma_s >= 0:
+            self.sound = math.sqrt(self.gamma_s * pressure_Pa * self.vSpecific)
+        else:
+            self.sound = None
+            
+        if self.u is not None and self.sound is not None and self.sound > 0:
+            self.mach = self.u / self.sound
+
+        return self
+
+    def computeMeanMolecularWeight(self, moles, index):
+        """
+        Compute Mean Molecular Weight [kg/mol]
+        """
+        moles_arr = np.array(moles).flatten()
+        mw_arr = np.array(self.chemicalSystem.molecularWeight)[index]
+        return np.dot(moles_arr, mw_arr) / np.sum(moles_arr)
+
+    def computeEntropyMixing(self, Ni, N_gas, R0, FLAG_NONZERO):
+        """
+        Compute entropy of mixing [J/K]
+        """
+        if not np.any(FLAG_NONZERO) or N_gas <= 0:
+            return 0.0
+            
+        Ni_nnz = np.array(Ni)[FLAG_NONZERO]
+        phase_nnz = np.array(self.phase)[FLAG_NONZERO]
+        
+        if self.p is None:
+            return 0.0
+            
+        Dsi = Ni_nnz * np.log(Ni_nnz / N_gas * self.p) * (1 - phase_nnz)
+        Ds = -R0 * np.sum(Dsi)
+        return Ds
+
+    def defineF(self):
+        """
+        Set Fuel of the mixture
+        """
+        if self.FLAG_FUEL:
+            self.systemMolesFuel = self.buildSystemMoles(self.listSpeciesFuel, self.molesFuel)
+            natomElementsFuel = np.sum(self.systemMolesFuel[:, np.newaxis] * np.array(self.chemicalSystem.stoichiometricMatrix), axis=0)
+            self.assignAtomElementsFuel(natomElementsFuel)
+            
+            c = getattr(self.fuel, 'C', 0)
+            h = getattr(self.fuel, 'H', 0)
+            o = getattr(self.fuel, 'O', 0)
+            s = getattr(self.fuel, 'S', 0)
+            si = getattr(self.fuel, 'Si', 0)
+            b = getattr(self.fuel, 'B', 0)
+            
+            self.stoichiometricMoles = abs(c + h/4 - o/2 + s + si + 3/4 * b) / (0.5 * self.chemicalSystem.oxidizerReferenceAtomsO)
+            return self
+
+        self.systemMolesFuel = np.zeros(self.chemicalSystem.numSpecies)
+        self.fuel.C = 0
+        self.fuel.H = 0
+        self.fuel.O = 0
+        self.fuel.N = 0
+        self.fuel.S = 0
+        self.fuel.Si = 0
+        self.fuel.B = 0
+        self.stoichiometricMoles = 0
+        return self
+
+    def defineO(self):
+        """
+        Set Oxidizer of the mixture
+        """
+        if not self.listSpeciesOxidizer:
+            self.systemMolesOxidizer = np.zeros(self.chemicalSystem.numSpecies)
+            return self
+
+        self.systemMolesOxidizer = self.buildSystemMoles(self.listSpeciesOxidizer, self.molesOxidizer)
+        return self
+
+    def assignAtomElementsFuel(self, natomElementsFuel):
+        """
+        Assign atomic counts of the fuel
+        """
+        sys = self.chemicalSystem
+        
+        def assign_if_exists(ind, attr):
+            if ind is not None and len(np.atleast_1d(ind)) > 0:
+                idx = ind[0] if isinstance(ind, list) else ind
+                # Adjust assuming Python 0-based index returned from system
+                setattr(self.fuel, attr, natomElementsFuel[idx])
+            else:
+                setattr(self.fuel, attr, 0)
+                
+        assign_if_exists(sys.ind_C, 'C')
+        assign_if_exists(sys.ind_H, 'H')
+        assign_if_exists(sys.ind_O, 'O')
+        assign_if_exists(sys.ind_N, 'N')
+        assign_if_exists(sys.ind_S, 'S')
+        assign_if_exists(sys.ind_Si, 'Si')
+        assign_if_exists(sys.ind_B, 'B')
+        return self
+
+    def computeEquilibriumTemperature(self, speciesTemperatures):
+        """
+        Compute the equilibrium temperature [K]
+        """
+        speciesTemperatures = np.array(speciesTemperatures).flatten()
+        tol0 = 1e-3
+        itMax = 100
+        
+        if len(np.unique(speciesTemperatures)) == 1:
+            return speciesTemperatures[0]
+
+        FLAG_FIXED = self.checkTemperatureSpecies()
+        if FLAG_FIXED:
+            return np.max(speciesTemperatures)
+
+        problemType = self.problemType if self.problemType else 'TP'
+        
+        pt_lower = problemType.lower()
+        if pt_lower in ['tv', 'ev', 'sv', 'volume', 'v']:
+            funCpOrCv = "getHeatCapacityVolume"
+            funHorE   = "getInternalEnergy"
+        else:
+            funCpOrCv = "getHeatCapacityPressure"
+            funHorE   = "getEnthalpy"
+
+        CpOrCv_0 = self.getPropertyListSpecies(funCpOrCv, speciesTemperatures)
+        HorE_0   = self.getPropertyListSpecies(funHorE, speciesTemperatures)
+        
+        qty = np.array(self.quantity)
+        T = np.sum(qty * speciesTemperatures * CpOrCv_0) / np.sum(qty * CpOrCv_0)
+        
+        it = 0
+        STOP = 1.0
+        
+        while STOP > tol0 and it < itMax:
+            it += 1
+            
+            HorE = self.getPropertyListSpecies(funHorE, T)
+            
+            f = np.sum(qty * HorE_0) - np.sum(qty * HorE)
+            f_rel = f / np.sum(qty * HorE)
+            
+            CpOrCv = self.getPropertyListSpecies(funCpOrCv, T)
+            df = -np.sum(qty * CpOrCv)
+            
+            DeltaT = -f / df
+            T = T + DeltaT
+            
+            STOP = max(abs(DeltaT), abs(f_rel))
+
+        return T
+
+    def getPropertyListSpecies(self, fun_name, temperatures):
+        """
+        Evaluate a given property function for each species
+        """
+        numSpecies = self.numSpecies
+        if np.isscalar(temperatures):
+            temperatures = np.full(numSpecies, temperatures)
+        else:
+            temperatures = np.array(temperatures)
+
+        values = np.zeros(numSpecies)
+        for i in range(numSpecies):
+            species = getattr(self.chemicalSystem.database.species, self.listSpecies[i])
+            method = getattr(species, fun_name)
+            values[i] = method(temperatures[i])
+
+        return values
+
+    def mergeDuplicateSpecies(self):
+        """
+        Merge quantities for repeated species names
+        """
+        if not self.listSpecies_:
+            return
+            
+        uniqueSpecies = []
+        indices = []
+        
+        for i, s in enumerate(self.listSpecies_):
+            if s not in uniqueSpecies:
+                uniqueSpecies.append(s)
+                indices.append(len(uniqueSpecies) - 1)
+            else:
+                indices.append(uniqueSpecies.index(s))
+                
+        if self.numSpecies == len(uniqueSpecies):
+            return
+            
+        combinedQuantity = np.zeros(len(uniqueSpecies))
+        for idx, qty in zip(indices, self.quantity):
+            combinedQuantity[idx] += qty
+            
+        self.listSpecies = uniqueSpecies
+        self.quantity = combinedQuantity.tolist()
+
+    @staticmethod
+    def getMass(system, moles):
+        """
+        Compute mass mixture [kg]
+        """
+        return np.dot(np.array(moles).flatten(), np.array(system.molecularWeight).flatten())
+
+    def setMolesFast(self, moles, *args):
+        """
+        Set the local composition vector and compute thermodynamic properties
+        """
+        moles = np.array(moles).flatten()
+        if len(moles) != self.chemicalSystem.numSpecies:
+            raise ValueError('Moles vector must have one entry per ChemicalSystem species.')
+
+        self._systemMoles = moles.tolist()
+        self.computeProperties(*args)
+        return self
+
+    def checkTemperatureSpecies(self):
+        """
+        Check if condensed species can be only evaluated a particular temperature
+        """
+        FLAG_FIXED = False
+        
+        if not hasattr(self, 'Tspecies'):
+            self.Tspecies = []
+            
+        for i in range(self.numSpecies):
+            species_name = self.listSpecies[i]
+            species = getattr(self.chemicalSystem.database.species, species_name)
+            
+            if np.isscalar(getattr(species, 'T', None)) and species.T is not None:
+                # Padding list if needed
+                while len(self.Tspecies) <= i:
+                    self.Tspecies.append(None)
+                self.Tspecies[i] = species.T
+                FLAG_FIXED = True
+                
+        return FLAG_FIXED
+
