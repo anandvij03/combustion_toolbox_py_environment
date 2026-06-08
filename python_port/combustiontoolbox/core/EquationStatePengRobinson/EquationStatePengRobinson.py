@@ -298,4 +298,322 @@ class EquationStatePengRobinson(EquationState):
             heatCapacityPressureDeparture,
             enthalpyDeparture,
             entropyDeparture,
+        )    
+    def initializeCache(self, chemicalSystem):
+        """
+        Cache the database values once to avoid field lookups
+        during iterative solver loops.
+        """
+
+        listSpecies = chemicalSystem.listSpecies
+        numSpecies = chemicalSystem.numSpecies
+
+        Tc = np.zeros(numSpecies)
+        Pc = np.zeros(numSpecies)
+        omega = np.zeros(numSpecies)
+
+        species = chemicalSystem.species
+
+        for i, name in enumerate(listSpecies):
+            sp = getattr(species, name)
+
+            Tc[i] = sp.Tcritical
+            Pc[i] = sp.Pcritical
+            omega[i] = sp.acentricFactor
+
+        self.temperatureCritical = Tc
+        self.pressureCritical = Pc * 1e5
+        self.acentricFactor = omega
+
+        self.FLAG_VALID = (
+            ~np.isnan(Tc)
+            & (Tc > 0.0)
+            & ~np.isnan(Pc)
+            & (Pc > 0.0)
+        )
+
+        self.cachedListSpecies = listSpecies
+
+    def getMixtureParameters(
+        self,
+        temperature,
+        molarFractions,
+        chemicalSystem,
+    ):
+        """
+        Compute mixture parameters using
+        van der Waals one-fluid mixing rules.
+        """
+
+        if (
+            self.cachedListSpecies is None
+            or self.cachedListSpecies
+            != chemicalSystem.listSpecies
+        ):
+            self.initializeCache(
+                chemicalSystem
+            )
+
+        FLAG_ACTIVE = (
+            np.asarray(
+                molarFractions
+            ).reshape(-1)
+            > 0.0
+        ) & self.FLAG_VALID.reshape(-1)
+
+        if not np.any(FLAG_ACTIVE):
+            return (
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+            )
+
+        X_active = np.asarray(
+            molarFractions
+        ).reshape(-1)[FLAG_ACTIVE]
+
+        Tc = self.temperatureCritical[
+            FLAG_ACTIVE
+        ]
+
+        Pc = self.pressureCritical[
+            FLAG_ACTIVE
+        ]
+
+        omega = self.acentricFactor[
+            FLAG_ACTIVE
+        ]
+
+        kappa = (
+            0.37464
+            + 1.54226 * omega
+            - 0.26992 * omega**2
+        )
+
+        Tr = temperature / Tc
+
+        sqrtTr = np.sqrt(Tr)
+
+        alpha = (
+            1.0
+            + kappa * (1.0 - sqrtTr)
+        ) ** 2
+
+        a_i = (
+            0.45724
+            * (
+                self.R0**2
+                * Tc**2
+                / Pc
+            )
+            * alpha
+        )
+
+        b_i = (
+            0.07780
+            * (
+                self.R0
+                * Tc
+                / Pc
+            )
+        )
+
+        dalpha_dT = (
+            -kappa
+            / (sqrtTr * Tc)
+            * (
+                1.0
+                + kappa
+                * (
+                    1.0
+                    - sqrtTr
+                )
+            )
+        )
+
+        d2alpha_dT2 = (
+            kappa
+            * (kappa + 1.0)
+            / (
+                2.0
+                * Tc**2
+                * Tr ** (3.0 / 2.0)
+            )
+        )
+
+        a0 = (
+            0.45724
+            * (
+                self.R0**2
+                * Tc**2
+                / Pc
+            )
+        )
+
+        da_dT_i = (
+            a0 * dalpha_dT
+        )
+
+        d2a_dT2_i = (
+            a0 * d2alpha_dT2
+        )
+
+        b_mix = np.dot(
+            X_active,
+            b_i,
+        )
+
+        sqrt_a_i = np.sqrt(
+            np.maximum(
+                a_i,
+                1e-20,
+            )
+        )
+
+        S1 = np.dot(
+            X_active,
+            sqrt_a_i,
+        )
+
+        a_mix = S1**2
+
+        S2 = np.dot(
+            X_active,
+            da_dT_i
+            / (2.0 * sqrt_a_i),
+        )
+
+        dadT_mix = (
+            2.0
+            * S1
+            * S2
+        )
+
+        S3 = np.dot(
+            X_active,
+            (
+                d2a_dT2_i
+                / (
+                    2.0
+                    * sqrt_a_i
+                )
+            )
+            - (
+                da_dT_i**2
+                / (
+                    4.0
+                    * sqrt_a_i**3
+                )
+            ),
+        )
+
+        d2adT2_mix = (
+            2.0 * S2**2
+            + 2.0 * S1 * S3
+        )
+
+        return (
+            a_mix,
+            b_mix,
+            dadT_mix,
+            d2adT2_mix,
+        )
+
+    def getPseudoCriticalProperties(
+        self,
+        molarFractions,
+        chemicalSystem,
+    ):
+        """
+        Compute pseudo-critical properties
+        for a multi-component mixture.
+        """
+
+        if (
+            self.cachedListSpecies is None
+            or self.cachedListSpecies
+            != chemicalSystem.listSpecies
+        ):
+            self.initializeCache(
+                chemicalSystem
+            )
+
+        mask = (
+            np.asarray(
+                molarFractions
+            ).reshape(-1)
+            > 0.0
+        ) & self.FLAG_VALID.reshape(-1)
+
+        Xi = np.asarray(
+            molarFractions
+        ).reshape(-1)[mask]
+
+        Tc_i = self.temperatureCritical[
+            mask
+        ]
+
+        Pc_i = self.pressureCritical[
+            mask
+        ]
+
+        omega_i = self.acentricFactor[
+            mask
+        ]
+
+        a_i_tc = (
+            0.45724
+            * (
+                self.R0**2
+                * Tc_i**2
+                / Pc_i
+            )
+        )
+
+        b_i = (
+            0.07780
+            * (
+                self.R0
+                * Tc_i
+                / Pc_i
+            )
+        )
+
+        a_mix_tc = (
+            np.dot(
+                Xi,
+                np.sqrt(a_i_tc),
+            )
+        ) ** 2
+
+        b_mix = np.dot(
+            Xi,
+            b_i,
+        )
+
+        temperatureCritical_mix = (
+            a_mix_tc
+            * 0.07780
+        ) / (
+            b_mix
+            * 0.45724
+            * self.R0
+        )
+
+        pressureCritical_mix = (
+            0.07780
+            * self.R0
+            * temperatureCritical_mix
+        ) / b_mix
+
+        acentricFactor_mix = np.dot(
+            Xi,
+            omega_i,
+        )
+
+        return (
+            temperatureCritical_mix,
+            pressureCritical_mix,
+            acentricFactor_mix,
         )
