@@ -42,4 +42,13 @@ codegen/
 # Octave session info
 octave-workspace
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+venv/
+.venv/
+
 # End of https://www.toptal.com/developers/gitignore/api/matlab
