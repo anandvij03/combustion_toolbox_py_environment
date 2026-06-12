@@ -5,21 +5,21 @@ def getEntropy(self, T):
     """
 
     try:
-        index = Species._cachedSpeciesS.index(
+        index = self.__class__._cachedSpeciesS.index(
             self.name
         )
 
-        s0curve = Species._cachedS0curves[index]
+        s0curve = self.__class__._cachedS0curves[index]
 
     except ValueError:
 
         s0curve = self.s0curve
 
-        Species._cachedSpeciesS.append(
+        self.__class__._cachedSpeciesS.append(
             self.name
         )
 
-        Species._cachedS0curves.append(
+        self.__class__._cachedS0curves.append(
             s0curve
         )
 

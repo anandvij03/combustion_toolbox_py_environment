@@ -5,18 +5,18 @@ def getHeatCapacityPressure(self, T):
     """
 
     if not hasattr(
-        Species.getHeatCapacityPressure,
+        self.__class__.getHeatCapacityPressure,
         "_cachedSpecies",
     ):
-        Species.getHeatCapacityPressure._cachedSpecies = []
-        Species.getHeatCapacityPressure._cachedCPcurves = []
+        self.__class__.getHeatCapacityPressure._cachedSpecies = []
+        self.__class__.getHeatCapacityPressure._cachedCPcurves = []
 
     cachedSpecies = (
-        Species.getHeatCapacityPressure._cachedSpecies
+        self.__class__.getHeatCapacityPressure._cachedSpecies
     )
 
     cachedCPcurves = (
-        Species.getHeatCapacityPressure._cachedCPcurves
+        self.__class__.getHeatCapacityPressure._cachedCPcurves
     )
 
     try:
