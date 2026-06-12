@@ -1512,3 +1512,10 @@ class Mixture:
                 
         return FLAG_FIXED
 
+    def print(self, *args, **kwargs):
+        from .print import print_mixtures
+        return print_mixtures(self, *args, **kwargs)
+
+    def setStagnation(self, *args, **kwargs):
+        from .setStagnation import setStagnation as set_stagnation
+        return set_stagnation(self, *args, **kwargs)

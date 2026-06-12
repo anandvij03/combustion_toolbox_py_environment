@@ -3,7 +3,7 @@ import re
 import numpy as np
 from abc import ABC
 
-from combustiontoolbox.databases.database import Database, DynamicStruct
+from combustiontoolbox.databases.Database.Database import Database, DynamicStruct
 from combustiontoolbox.common.Constants import Constants
 from combustiontoolbox.core.Elements.Elements import Elements
 from combustiontoolbox.core.Species.Species import Species

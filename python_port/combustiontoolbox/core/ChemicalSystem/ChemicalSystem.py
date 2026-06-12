@@ -245,3 +245,32 @@ class ChemicalSystem:
             self.temperatureMax[i] = T_arr[-1]
             
         return self
+
+    def findProducts(self, *args, **kwargs):
+        from .findProducts import findProducts
+        return findProducts(self, *args, **kwargs)
+
+    def setListSpecies(self, *args, **kwargs):
+        from .setListSpecies import setListSpecies
+        return setListSpecies(self, *args, **kwargs)
+
+    def _get_list_species(self, *args, **kwargs):
+        from .setListSpecies import _get_list_species
+        return _get_list_species(self, *args, **kwargs)
+
+    def _get_formula(self, *args, **kwargs):
+        from .setListSpecies import _get_formula
+        return _get_formula(self, *args, **kwargs)
+
+    def getIndexElements(self, list_species, max_elements=5):
+        from combustiontoolbox.core.Elements.Elements import Elements
+        elements_list = Elements().getElements()
+        num_species = len(list_species)
+        index_elements = np.zeros((num_species, max_elements))
+        for i, sp in enumerate(list_species):
+            species_obj = self.database.species[sp]
+            temp = species_obj.getElementMatrix(elements_list)
+            length = temp.shape[1]
+            index_elements[i, :length] = temp[0, :]
+        index_elements = -np.sort(-index_elements, axis=1)
+        return index_elements
