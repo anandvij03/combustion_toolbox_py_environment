@@ -5,18 +5,18 @@ def getGibbsEnergy(self, T):
     """
 
     if not hasattr(
-        Species.getGibbsEnergy,
+        self.__class__.getGibbsEnergy,
         "_cachedSpecies",
     ):
-        Species.getGibbsEnergy._cachedSpecies = []
-        Species.getGibbsEnergy._cachedG0curves = []
+        self.__class__.getGibbsEnergy._cachedSpecies = []
+        self.__class__.getGibbsEnergy._cachedG0curves = []
 
     cachedSpecies = (
-        Species.getGibbsEnergy._cachedSpecies
+        self.__class__.getGibbsEnergy._cachedSpecies
     )
 
     cachedG0curves = (
-        Species.getGibbsEnergy._cachedG0curves
+        self.__class__.getGibbsEnergy._cachedG0curves
     )
 
     try:
