@@ -73,7 +73,7 @@ class EquilibriumSolver:
             self.plotConfig = kwargs.get('plotConfig', None)
 
         try:
-            from combustiontoolbox.core.CaloricGasModel import CaloricGasModel
+            from combustiontoolbox.core.CaloricGasModel.CaloricGasModel import CaloricGasModel
             default_model = CaloricGasModel.imperfect
         except ImportError:
             default_model = None

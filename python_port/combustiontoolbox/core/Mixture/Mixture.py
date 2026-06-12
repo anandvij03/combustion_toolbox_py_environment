@@ -20,11 +20,11 @@ class Mixture:
         """
         
         if eos is None:
-            from combustiontoolbox.core.EquationStateIdealGas import EquationStateIdealGas
+            from combustiontoolbox.core.EquationStateIdealGas.EquationStateIdealGas import EquationStateIdealGas
             eos = EquationStateIdealGas()
             
         if config is None:
-            from combustiontoolbox.core.MixtureConfig import MixtureConfig
+            from combustiontoolbox.core.MixtureConfig.MixtureConfig import MixtureConfig
             config = MixtureConfig()
 
         # Public properties
@@ -153,7 +153,7 @@ class Mixture:
     def equilibriumSolver(self):
         """Get equilibrium solver object"""
         if self._equilibriumSolver_ is None:
-            from combustiontoolbox.core.CaloricGasModel import CaloricGasModel
+            from combustiontoolbox.core.CaloricGasModel.CaloricGasModel import CaloricGasModel
             from combustiontoolbox.equilibrium.EquilibriumSolver import EquilibriumSolver
             
             caloricGasModel = CaloricGasModel.thermallyPerfect

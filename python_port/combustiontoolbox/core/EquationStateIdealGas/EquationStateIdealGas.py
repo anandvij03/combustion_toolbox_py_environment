@@ -1,4 +1,4 @@
-from combustiontoolbox.core.EquationState import EquationState
+from combustiontoolbox.core.EquationState.EquationState import EquationState
 from combustiontoolbox.common.Constants import Constants
 
 
