@@ -168,10 +168,10 @@ class NasaDatabase(Database):
             cp0[i] = R0 * np.sum(a[Tinterval] * (T ** Texponents[Tinterval]))
             
             h_coeffs = np.array([-1.0, np.log(T), 1.0, 1/2, 1/3, 1/4, 1/5, 0.0], dtype=float)
-            h0[i] = R0 * T * (np.sum(a[Tinterval] * (T ** tExponents[Tinterval]) * h_coeffs) + b[Tinterval][0] / T)
+            h0[i] = R0 * T * (np.sum(a[Tinterval] * (T ** Texponents[Tinterval]) * h_coeffs) + b[Tinterval][0] / T)
             
             s_coeffs = np.array([-1/2, -1.0, np.log(T), 1.0, 1/2, 1/3, 1/4, 0.0], dtype=float)
-            s0[i] = R0 * (np.sum(a[Tinterval] * (T ** tExponents[Tinterval]) * s_coeffs) + b[Tinterval][1])
+            s0[i] = R0 * (np.sum(a[Tinterval] * (T ** Texponents[Tinterval]) * s_coeffs) + b[Tinterval][1])
             
             if not FLAG_REFERENCE:
                 g0[i] = h0[i] - T * s0[i]
@@ -269,7 +269,7 @@ class NasaDatabase(Database):
         """
         Generate Master Database (DB_master) with the thermodynamic data of the chemical species
         """
-        from combustiontoolbox.databases.database import resolve_path
+        from combustiontoolbox.databases.Database.Database import resolve_path
         resolved_thermoFile = resolve_path(thermoFile)
         
         if thermoFile == 'thermo_CT.inp':
@@ -295,7 +295,7 @@ class NasaDatabase(Database):
                 if tline_stripped.startswith('!'):
                     continue
                     
-                if 'thermo' in tline_stripped.lower():
+                if tline_stripped.lower() == 'thermo':
                     # Read the next line to skip header
                     fid.readline()
                     continue
@@ -321,46 +321,48 @@ class NasaDatabase(Database):
                 else:
                     temp.Tref = self.temperatureReference
                     
-                # Read second line
+                                # Read second line
                 tline = fid.readline()
                 temp.Tintervals = int(tline[0:2].strip())
                 temp.refCode = tline[3:9].strip()
                 temp.formula = tline[10:50]
                 temp.phase = float(int(tline[50:52].strip()) != 0)
-                temp.W = float(tline[52:65].strip()) * 1e-3
-                temp.hf = float(tline[65:80].strip())
+                temp.W = float(tline[52:65].strip().replace('d', 'e').replace('D', 'e')) * 1e-3
+                temp.hf = float(tline[65:80].strip().replace('d', 'e').replace('D', 'e'))
                 
                 if temp.Tintervals == 0:
-                    tline = fid.readline()
+                    tline = fid.readline().replace('d', 'e').replace('D', 'e')
                     temp.Trange = np.fromstring(tline[0:22], sep=' ')
                     temp.Texponents = np.fromstring(tline[23:63], sep=' ')
                     temp.hftoh0 = float(tline[65:].strip())
-                    
-                temp.Trange = [None] * temp.Tintervals
-                temp.Texponents = [None] * temp.Tintervals
-                temp.hftoh0 = [None] * temp.Tintervals
-                temp.a = [None] * temp.Tintervals
-                temp.b = [None] * temp.Tintervals
+                else:
+                    temp.Trange = [None] * temp.Tintervals
+                    temp.Texponents = [None] * temp.Tintervals
+                    temp.hftoh0 = [None] * temp.Tintervals
+                    temp.a = [None] * temp.Tintervals
+                    temp.b = [None] * temp.Tintervals
+
                 
                 for Tinterval in range(temp.Tintervals):
-                    tline = fid.readline()
+                    tline = fid.readline().replace('d', 'e').replace('D', 'e')
                     temp.Trange[Tinterval] = np.fromstring(tline[0:22], sep=' ')
                     temp.Texponents[Tinterval] = np.fromstring(tline[23:63], sep=' ')
                     temp.hftoh0[Tinterval] = float(tline[65:].strip())
                     
-                    tline = fid.readline()
+                    tline = fid.readline().replace('d', 'e').replace('D', 'e')
                     a1 = float(tline[0:16].strip())
                     a2 = float(tline[16:32].strip())
                     a3 = float(tline[32:48].strip())
                     a4 = float(tline[48:64].strip())
                     a5 = float(tline[64:80].strip())
                     
-                    tline = fid.readline()
+                    tline = fid.readline().replace('d', 'e').replace('D', 'e')
                     a6 = float(tline[0:16].strip())
                     a7 = float(tline[16:32].strip())
                     a8 = 0.0
                     b1 = float(tline[48:64].strip())
                     b2 = float(tline[64:80].strip())
+
                     
                     temp.a[Tinterval] = [a1, a2, a3, a4, a5, a6, a7, a8]
                     temp.b[Tinterval] = [b1, b2]
