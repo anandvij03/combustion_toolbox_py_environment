@@ -36,10 +36,10 @@ mix.set({'N2', 'O2', 'Ar', 'CO2'}, 'oxidizer', np.array([78.084, 20.9476, 0.9365
 mixArray = mix.setProperties('temperature', 300, 'volume', 1, 'equivalenceRatio', np.arange(0.5, 5.01, 0.01))
 
 # Initialize solver
-solver = EquilibriumSolver('problemType', 'EV')
+solver = EquilibriumSolver(problemType='EV')
 
 # Solve the problem
 solver.solveArray(mixArray)
 
 # Generate report
-report(solver, mixArray)
+solver.report(mixArray)
