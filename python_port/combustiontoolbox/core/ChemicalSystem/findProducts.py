@@ -10,19 +10,19 @@ def getCrossTermms(index_elements, max_elements=5):
     unique_vals = np.unique(index_elements)
     ind_perm = sorted(unique_vals, reverse=True)
     
-    # Pad with zeros to handle elements up to MAX_ELEMENTS - 2
+    # Pad with -1 to handle elements up to MAX_ELEMENTS - 2
     padding_len = max_elements - 2
-    ind_perm.extend([0] * padding_len)
+    ind_perm.extend([-1] * padding_len)
     
     n_elements = len(ind_perm)
     
     for i in range(n_elements):
-        if ind_perm[i] == 0:
+        if ind_perm[i] == -1:
             continue
         for j in range(i + 1, n_elements):
             for k in range(j + 1, n_elements):
                 for l in range(k + 1, n_elements):
-                    temp_add = [ind_perm[i], ind_perm[j], ind_perm[k], ind_perm[l], 0]
+                    temp_add = [ind_perm[i], ind_perm[j], ind_perm[k], ind_perm[l], -1]
                     temp.append(temp_add)
                     
     return np.array(temp) if temp else np.empty((0, max_elements))

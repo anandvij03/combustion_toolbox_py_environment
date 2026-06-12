@@ -161,6 +161,13 @@ class NasaDatabase(Database):
         ef = np.full(N, ef_val)
 
         for i, T in enumerate(temperature_arr):
+            if T <= 0.0:
+                cp0[i] = 0.0
+                h0[i] = 0.0
+                s0[i] = 0.0
+                g0[i] = 0.0
+                continue
+
             # Get temperature interval
             Tinterval = self.getIndexTempereratureInterval(species, T, DB) - 1 # 0-indexed in Python
 
@@ -177,6 +184,7 @@ class NasaDatabase(Database):
                 g0[i] = h0[i] - T * s0[i]
             else:
                 g0[i] = 0.0
+
 
         if units.lower() == 'mass':
             cp0 = molar2mass(cp0)

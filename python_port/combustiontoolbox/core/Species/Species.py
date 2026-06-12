@@ -198,15 +198,15 @@ class Species:
         Compute element matrix of the given species formula.
 
         Returns a 2x5 matrix:
-            row 1 = element indices
+            row 1 = element indices (0-based, or -1 if unassigned)
             row 2 = atom counts
         """
-
         N = 40
         NE = 5
         step = 8
 
         elementMatrix = np.zeros((2, NE), dtype=int)
+        elementMatrix[0, :] = -1  # Initialize all element indices to -1 (placeholder)
 
         formula = (self.formula or "").ljust(N)
 
@@ -214,7 +214,6 @@ class Species:
             end0 = N - step * (NE - i)
             start0 = end0 - 5
 
-            # MATLAB: obj.formula(start0 - 2:end0 - 6)
             element_i = formula[start0 - 3 : end0 - 6].strip()
 
             if element_i == "":
@@ -226,7 +225,7 @@ class Species:
             idx = None
             for j, el in enumerate(elements):
                 if str(el).lower() == element_i.lower():
-                    idx = j + 1  # MATLAB-style 1-based index
+                    idx = j  # 0-based index in Python
                     break
 
             if idx is None:
@@ -239,6 +238,7 @@ class Species:
             elementMatrix[1, i - 1] = atom_count
 
         return elementMatrix
+
 
     def setID(self):
         """

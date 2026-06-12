@@ -221,7 +221,9 @@ class ChemicalSystem:
         A0 = np.zeros((self.numSpecies, self.numElements))
         for i, sp in enumerate(self.listSpecies):
             el_mat = self.species[sp].getElementMatrix(self.listElements)
-            A0[i, el_mat[0, :].astype(int)] = el_mat[1, :]
+            valid_mask = el_mat[0, :] >= 0
+            valid_indices = el_mat[0, valid_mask].astype(int)
+            A0[i, valid_indices] = el_mat[1, valid_mask]
         self.stoichiometricMatrix = A0
         return self
 
@@ -266,7 +268,7 @@ class ChemicalSystem:
         from combustiontoolbox.core.Elements.Elements import Elements
         elements_list = Elements().getElements()
         num_species = len(list_species)
-        index_elements = np.zeros((num_species, max_elements))
+        index_elements = np.full((num_species, max_elements), -1.0)
         for i, sp in enumerate(list_species):
             species_obj = self.database.species[sp]
             temp = species_obj.getElementMatrix(elements_list)
@@ -274,3 +276,4 @@ class ChemicalSystem:
             index_elements[i, :length] = temp[0, :]
         index_elements = -np.sort(-index_elements, axis=1)
         return index_elements
+

@@ -56,8 +56,8 @@ class SolarAbundances:
 
         # Recompute with metallicity. NOTE: H and He do not change their abundances
         if metallicity is not None:
-            index_H = findIndex(elementsDB, "H") - 1  # 0-indexed in Python
-            index_He = findIndex(elementsDB, "He") - 1  # 0-indexed in Python
+            index_H = findIndex(elementsDB, "H")  # 0-indexed in Python
+            index_He = findIndex(elementsDB, "He")  # 0-indexed in Python
 
             index_change = list(range(len(elementsDB)))
             if index_He in index_change:
@@ -73,11 +73,11 @@ class SolarAbundances:
 
         indices = []
         for el in elements_list:
-            idx = findIndex(elementsDB, el) - 1  # 0-indexed
+            idx = findIndex(elementsDB, el)  # 0-indexed
             indices.append(idx)
 
         # Compute moles relative to H of the remaining elements in the mixture
-        ref_idx = self.indexElementRefence - 1  # 0-indexed
+        ref_idx = self.indexElementRefence  # 0-indexed
         moles = 10.0 ** (logAbundances[indices] - logAbundances[ref_idx])
 
         if is_scalar:
