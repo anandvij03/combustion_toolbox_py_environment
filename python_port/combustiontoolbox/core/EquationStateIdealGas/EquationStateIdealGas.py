@@ -66,7 +66,6 @@ class EquationStateIdealGas(EquationState):
         ___,
         ____,
         _____,
-        ______,
         *args,
     ):
         """
@@ -85,7 +84,6 @@ class EquationStateIdealGas(EquationState):
         ___,
         ____,
         _____,
-        ______,
         *args,
     ):
         """

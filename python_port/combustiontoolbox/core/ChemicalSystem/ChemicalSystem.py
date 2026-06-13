@@ -152,6 +152,26 @@ class ChemicalSystem:
             thermo['gibbs'][idx, :] = self._thermo_cache['g'][i](T)
         return thermo
 
+    def evaluateSpeciesThermoHCPS(self, T, index=None):
+        thermo = self.evaluateSpeciesThermo(T, index)
+        return thermo['enthalpy'], thermo['heatCapacityPressure'], thermo['entropy']
+
+    def evaluateSpeciesThermoCPS(self, T, index=None):
+        thermo = self.evaluateSpeciesThermo(T, index)
+        return thermo['heatCapacityPressure'], thermo['entropy']
+
+    def evaluateSpeciesThermoH(self, T, index=None):
+        thermo = self.evaluateSpeciesThermo(T, index)
+        return thermo['enthalpy']
+
+    def evaluateSpeciesThermoHG(self, T, index=None):
+        thermo = self.evaluateSpeciesThermo(T, index)
+        return thermo['enthalpy'], thermo['gibbs']
+
+    def evaluateSpeciesThermoG(self, T, index=None):
+        thermo = self.evaluateSpeciesThermo(T, index)
+        return thermo['gibbs']
+
 
     @staticmethod
     def clearThermoCache():
