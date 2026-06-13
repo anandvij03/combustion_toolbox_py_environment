@@ -127,8 +127,9 @@ class Mixture:
         self.molesFuel = None             # Moles of fuel (initial mixture)
         self.molesOxidizer = None         # Moles of oxidizer (initial mixture)
         self.molesInert = None            # Moles of inert (initial mixture)
+        from types import SimpleNamespace
         self.ratioOxidizer = None         # Ratio oxidizer relative to the oxidizer of reference (initial mixture)
-        self.fuel = None                  # Fuel atoms (initial mixture)
+        self.fuel = SimpleNamespace()     # Fuel atoms (initial mixture)
         self.FLAG_FUEL = False            # Flag to indicate fuel species are defined (initial mixture)
         self.FLAG_OXIDIZER = False        # Flag to indicate oxidizer species are defined (initial mixture)
         self.FLAG_INERT = False           # Flag to indicate inert species are defined (initial mixture)
@@ -145,6 +146,17 @@ class Mixture:
         self._equilibriumSolver_ = None   # Equilibrium solver object
         self._listSpecies_ = None         # Original immutable species list (initial mixture)
 
+    def copy(self):
+        """
+        Create a copy of the mixture object, deep copying mutable helper attributes like SimpleNamespace
+        """
+        new_obj = copy.copy(self)
+        from types import SimpleNamespace
+        if hasattr(self, 'fuel') and isinstance(self.fuel, SimpleNamespace):
+            new_obj.fuel = SimpleNamespace(**vars(self.fuel))
+        return new_obj
+
+
     @property
     def productSpeciesSet(self):
         return self._productSpeciesSet
@@ -156,7 +168,7 @@ class Mixture:
             from combustiontoolbox.core.CaloricGasModel.CaloricGasModel import CaloricGasModel
             from combustiontoolbox.equilibrium.EquilibriumSolver import EquilibriumSolver
             
-            caloricGasModel = CaloricGasModel.thermallyPerfect
+            caloricGasModel = CaloricGasModel.THERMALLY_PERFECT
             self._equilibriumSolver_ = EquilibriumSolver(caloricGasModel=caloricGasModel, FLAG_RESULTS=False)
         return self._equilibriumSolver_
 
@@ -377,7 +389,7 @@ class Mixture:
                 if self.listSpeciesFuel is None: self.listSpeciesFuel = []
                 if self.molesFuel is None: self.molesFuel = []
                 self.listSpeciesFuel.extend(listSpecies)
-                if isinstance(quantity, (list, tuple)):
+                if isinstance(quantity, (list, tuple, np.ndarray)):
                     self.molesFuel.extend(quantity)
                 else:
                     self.molesFuel.append(quantity)
@@ -386,7 +398,7 @@ class Mixture:
                 if self.listSpeciesOxidizer is None: self.listSpeciesOxidizer = []
                 if self.molesOxidizer is None: self.molesOxidizer = []
                 self.listSpeciesOxidizer.extend(listSpecies)
-                if isinstance(quantity, (list, tuple)):
+                if isinstance(quantity, (list, tuple, np.ndarray)):
                     self.molesOxidizer.extend(quantity)
                 else:
                     self.molesOxidizer.append(quantity)
@@ -397,7 +409,7 @@ class Mixture:
                 if self.listSpeciesInert is None: self.listSpeciesInert = []
                 if self.molesInert is None: self.molesInert = []
                 self.listSpeciesInert.extend(listSpecies)
-                if isinstance(quantity, (list, tuple)):
+                if isinstance(quantity, (list, tuple, np.ndarray)):
                     self.molesInert.extend(quantity)
                 else:
                     self.molesInert.append(quantity)
@@ -407,7 +419,7 @@ class Mixture:
         if self.quantity is None: self.quantity = []
         
         self.listSpecies.extend(listSpecies)
-        if isinstance(quantity, (list, tuple)):
+        if isinstance(quantity, (list, tuple, np.ndarray)):
             self.quantity.extend(quantity)
         else:
             self.quantity.append(quantity)
@@ -709,7 +721,7 @@ class Mixture:
             if self.equivalenceRatio is not None:
                 if self.ratioOxidizer is None:
                     self.ratioOxidizer = list(self.molesOxidizer)
-                self.molesOxidizer = self.stoichiometricMoles / self.equivalenceRatio * np.array(self.ratioOxidizer)
+                self.molesOxidizer = (self.stoichiometricMoles / self.equivalenceRatio * np.array(self.ratioOxidizer)).tolist()
 
             self.defineO()
             
@@ -1318,8 +1330,8 @@ class Mixture:
         Set Fuel of the mixture
         """
         if self.FLAG_FUEL:
-            self.systemMolesFuel = self.buildSystemMoles(self.listSpeciesFuel, self.molesFuel)
-            natomElementsFuel = np.sum(self.systemMolesFuel[:, np.newaxis] * np.array(self.chemicalSystem.stoichiometricMatrix), axis=0)
+            self._systemMolesFuel = self.buildSystemMoles(self.listSpeciesFuel, self.molesFuel)
+            natomElementsFuel = np.sum(self._systemMolesFuel[:, np.newaxis] * np.array(self.chemicalSystem.stoichiometricMatrix), axis=0)
             self.assignAtomElementsFuel(natomElementsFuel)
             
             c = getattr(self.fuel, 'C', 0)
@@ -1332,7 +1344,7 @@ class Mixture:
             self.stoichiometricMoles = abs(c + h/4 - o/2 + s + si + 3/4 * b) / (0.5 * self.chemicalSystem.oxidizerReferenceAtomsO)
             return self
 
-        self.systemMolesFuel = np.zeros(self.chemicalSystem.numSpecies)
+        self._systemMolesFuel = np.zeros(self.chemicalSystem.numSpecies)
         self.fuel.C = 0
         self.fuel.H = 0
         self.fuel.O = 0
@@ -1348,10 +1360,10 @@ class Mixture:
         Set Oxidizer of the mixture
         """
         if not self.listSpeciesOxidizer:
-            self.systemMolesOxidizer = np.zeros(self.chemicalSystem.numSpecies)
+            self._systemMolesOxidizer = np.zeros(self.chemicalSystem.numSpecies)
             return self
 
-        self.systemMolesOxidizer = self.buildSystemMoles(self.listSpeciesOxidizer, self.molesOxidizer)
+        self._systemMolesOxidizer = self.buildSystemMoles(self.listSpeciesOxidizer, self.molesOxidizer)
         return self
 
     def assignAtomElementsFuel(self, natomElementsFuel):

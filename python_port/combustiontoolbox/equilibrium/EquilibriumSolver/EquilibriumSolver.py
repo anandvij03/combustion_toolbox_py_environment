@@ -74,7 +74,7 @@ class EquilibriumSolver:
 
         try:
             from combustiontoolbox.core.CaloricGasModel.CaloricGasModel import CaloricGasModel
-            default_model = CaloricGasModel.imperfect
+            default_model = CaloricGasModel.IMPERFECT
         except ImportError:
             default_model = None
 
