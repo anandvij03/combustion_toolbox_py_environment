@@ -264,6 +264,79 @@ class ChemicalSystem:
         from .setListSpecies import _get_formula
         return _get_formula(self, *args, **kwargs)
 
+    def setReactIndex(self, species_frozen):
+        """
+        Set index of reacting (non-frozen) and frozen species
+        """
+        # Initialize react indices (0-based in Python)
+        self.indexReact = list(range(self.numSpecies))
+        
+        if not species_frozen:
+            self.indexFrozen = []
+            return self
+            
+        # Get index of frozen species
+        from combustiontoolbox.utils.findIndex import findIndex
+        index = findIndex(self.listSpecies, species_frozen)
+        
+        if index is None:
+            self.indexFrozen = []
+        elif isinstance(index, list):
+            self.indexFrozen = index
+        else:
+            self.indexFrozen = [index]
+            
+        # Remove frozen species indices from reacting species
+        for idx in self.indexFrozen:
+            if idx in self.indexReact:
+                self.indexReact.remove(idx)
+                
+        return self
+
+    def setOxidizerReference(self, list_oxidizer):
+        """
+        Set oxidizer of reference for computations with the equivalence ratio
+        """
+        if not list_oxidizer:
+            self.oxidizerReferenceIndex = None
+            self.oxidizerReferenceAtomsO = np.nan
+            return self
+
+        from combustiontoolbox.utils.findIndex import findIndex
+
+        if 'O2' in list_oxidizer:
+            self.oxidizerReferenceIndex = findIndex(self.listSpecies, 'O2')
+            self.oxidizerReferenceAtomsO = 2.0
+        elif 'O2bLb' in list_oxidizer:
+            self.oxidizerReferenceIndex = findIndex(self.listSpecies, 'O2bLb')
+            self.oxidizerReferenceAtomsO = 2.0
+        else:
+            # Find the first oxidizer containing 'O'
+            species = None
+            for ox in list_oxidizer:
+                if 'O' in ox:
+                    species = ox
+                    break
+            
+            if species is None:
+                self.oxidizerReferenceIndex = None
+                self.oxidizerReferenceAtomsO = np.nan
+                return self
+                
+            self.oxidizerReferenceIndex = findIndex(self.listSpecies, species)
+            
+            # Find the number of oxygen atoms in the reference oxidizer's formula
+            species_obj = self.species[species]
+            el_mat = species_obj.getElementMatrix(['O'])
+            o_indices = np.where(el_mat[0, :] == 0)[0]
+            if len(o_indices) > 0:
+                self.oxidizerReferenceAtomsO = float(el_mat[1, o_indices[0]])
+            else:
+                self.oxidizerReferenceAtomsO = 1.0
+
+        return self
+
+
     def getIndexElements(self, list_species, max_elements=5):
         from combustiontoolbox.core.Elements.Elements import Elements
         elements_list = Elements().getElements()
