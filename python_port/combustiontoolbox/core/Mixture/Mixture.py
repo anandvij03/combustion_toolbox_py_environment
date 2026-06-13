@@ -984,17 +984,20 @@ class Mixture:
         gas_mask = np.isin(indexGas, indexProducts)
         cond_mask = np.isin(indexCondensed, indexProducts)
         
-        return np.concatenate((indexGas[gas_mask], indexCondensed[cond_mask]))
+        return np.concatenate((indexGas[gas_mask], indexCondensed[cond_mask])).astype(int)
+
 
     def getProductSpeciesSet(self, indexProducts):
         """
         Get product species set with ChemicalSystem data and solver-local indices
         """
         system = self.chemicalSystem
-        indexProducts = np.array(indexProducts).flatten()
+        indexProducts = np.array(indexProducts, dtype=int).flatten()
+
         
         # Using integer arrays to index directly
-        phase = np.array(system.phase)[indexProducts]
+        phase = np.array(system.phase, dtype=bool)[indexProducts]
+
 
         productSpeciesSet = type('ProductSpeciesSet', (), {})()
         productSpeciesSet.indexGlobal = indexProducts
@@ -1036,7 +1039,7 @@ class Mixture:
         molecularWeight = np.array(system.molecularWeight)
 
         self.N = np.sum(Ni)
-        self.phase = np.array(system.phase)
+        self.phase = np.array(system.phase, dtype=bool)
 
         N_gas = np.sum(Ni[~self.phase])
         
@@ -1448,13 +1451,13 @@ class Mixture:
         """
         Merge quantities for repeated species names
         """
-        if not self.listSpecies_:
+        if not self._listSpecies_:
             return
             
         uniqueSpecies = []
         indices = []
         
-        for i, s in enumerate(self.listSpecies_):
+        for i, s in enumerate(self._listSpecies_):
             if s not in uniqueSpecies:
                 uniqueSpecies.append(s)
                 indices.append(len(uniqueSpecies) - 1)
