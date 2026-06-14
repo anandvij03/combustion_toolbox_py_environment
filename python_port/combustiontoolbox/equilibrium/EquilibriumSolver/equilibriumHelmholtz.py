@@ -74,7 +74,7 @@ def equilibriumHelmholtz(self, system, productSpeciesSet, v, T, mix, molesGuess)
     # Molar Gibbs energy [J/mol]
     index0Global = np.asarray(productSpeciesSet.indexGlobal)[np.concatenate((indexGas_0, indexCondensed_0))]
     local_indices = np.concatenate((indexGas_0, indexCondensed_0))
-    g0[local_indices] = system.evaluateSpeciesThermoG(T, index0Global)
+    g0[local_indices] = system.evaluateSpeciesThermoG(T, index0Global).flatten()
     
     # Dimensionless Gibbs energy
     g0RT = g0 / RT
@@ -111,7 +111,7 @@ def equilibriumHelmholtz(self, system, productSpeciesSet, v, T, mix, molesGuess)
 
     # NESTED FUNCTION: equilibriumLoop
     def equilibriumLoop():
-        nonlocal indexGas, indexCondensed, index, NG, NS, N, NP, psi_j, STOP_ions, FLAG_E, NE, A0, A0_T, indexElements, NatomE, STOP
+        nonlocal indexGas, indexCondensed, indexIons, index, NG, NS, N, NP, psi_j, STOP_ions, FLAG_E, NE, A0, A0_T, indexElements, NatomE, STOP
         
         it = 0
         counter_errors = 0
@@ -216,7 +216,7 @@ def equilibriumHelmholtz(self, system, productSpeciesSet, v, T, mix, molesGuess)
 
     # NESTED FUNCTION: equilibriumLoopCondensed
     def equilibriumLoopCondensed(x):
-        nonlocal indexGas, indexCondensed, index, NG, NS, N, psi_j, indexGas_0
+        nonlocal indexGas, indexCondensed, indexIons, index, NG, NS, N, psi_j, indexGas_0
         
         if indexCondensed_0 is None or len(indexCondensed_0) == 0:
             return x
@@ -334,7 +334,7 @@ def equilibriumHelmholtz(self, system, productSpeciesSet, v, T, mix, molesGuess)
     J = np.vstack((np.hstack((J, J12_2[:, np.newaxis])), np.append(J12_2, 0.0)[np.newaxis, :]))
 
     # Molar enthalpy [J/mol]
-    h0[index] = system.evaluateSpeciesThermoH(T, np.asarray(productSpeciesSet.indexGlobal)[index])
+    h0[index] = system.evaluateSpeciesThermoH(T, np.asarray(productSpeciesSet.indexGlobal)[index]).flatten()
     
     # Dimensionless enthalpy
     H0RT = h0 / RT
