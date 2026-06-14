@@ -38,12 +38,8 @@ def equilibriumGuess(self, N, NP, A0, muRT, b0, index, indexGas, indexIons, NG, 
         NP = np.sum(molesGuess[indexGas])
         return N, NP
 
-    try:
-        # Get molar composition using the simplex method
-        N = getSimplex(N, A0, muRT, b0, index, indexIons, NG)
-    except Exception:
-        # Get molar composition using a uniform distribution
-        N[indexGas] = NP / NG
+    # Get molar composition using the simplex method
+    N = getSimplex(N, A0, muRT, b0, index, indexIons, NG)
 
     # Recompute mol gaseous species
     NP = np.sum(N[indexGas])
@@ -63,30 +59,25 @@ def getSimplex(N, A0, muRT, b0, index, indexIons, NG):
     Nmajor = simplex(A0, b0, muRT)
 
     # Remove ionized species from Nmajor
-    Nmajor[indexIons] = 0.0
+    local_index_ions = np.where(np.isin(index, indexIons))[0]
+    Nmajor[local_index_ions] = 0.0
 
     # Get minor species
     if FLAG_MINOR:
         tol = 1e-4
         FLAG_MAXMIN = Nmajor > tol
 
-        # In Python, condensed species indices start at NG
+       # Gaseous columns are 0:NG, condensed columns are NG:NS
         if np.any(FLAG_MAXMIN[NG:]):
-            indexPass = np.unique(np.concatenate((
-                np.arange(NG),
-                NG + index[NG:]
-            )))
+            indexPass = np.arange(len(index))
         else:
-            cond_flag = FLAG_MAXMIN[NG:]
-            indexPass = np.unique(np.concatenate((
-                np.arange(NG),
-                NG + index[:len(cond_flag)][cond_flag]
-            )))
+            cond_indices = NG + np.where(FLAG_MAXMIN[NG:])[0]
+            indexPass = np.concatenate((np.arange(NG), cond_indices))
 
         indexPass = indexPass.astype(int)
 
         Nminor_indexPass, Nmin = simplexDual(A0[:, indexPass], b0)
-        Nminor[indexPass] = Nminor_indexPass
+        Nminor[index[indexPass]] = Nminor_indexPass
         Nmin = Nmin + 1e-10
 
     # Merge solutions

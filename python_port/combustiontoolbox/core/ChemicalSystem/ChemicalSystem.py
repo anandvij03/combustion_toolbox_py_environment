@@ -201,10 +201,14 @@ class ChemicalSystem:
         for i in range(self.numSpecies - 1, -1, -1):
             formula = self._listSpeciesFormula[i] if self._listSpeciesFormula else getattr(self.species[self.listSpecies[i]], 'formula', '')
             
-            matches = re.findall(r'[A-Z][a-z]*', formula)
-            elements.update(matches)
+            matches_2 = re.findall(r'[A-Z]{2,}', formula)
+            elements.update(matches_2)
             
-        self.listElements = sorted(list(elements))
+            formula_1 = re.sub(r'[A-Z]{2,}', ' ', formula)
+            matches_1 = re.findall(r'[A-Z]', formula_1)
+            elements.update(matches_1)
+            
+        self.listElements = sorted(list(set([el.capitalize() for el in elements])))
 
         def find_idx(el):
             return self.listElements.index(el) if el in self.listElements else None
@@ -273,9 +277,11 @@ class ChemicalSystem:
             self.molecularWeight[i] = getattr(species_obj, 'W', 0)
             self.phase[i] = getattr(species_obj, 'phase', 0)
             
-            T_arr = getattr(species_obj, 'T', [0, 0])
+            T_val = getattr(species_obj, 'T', None)
+            T_arr = np.atleast_1d(T_val if T_val is not None else 0)
             self.temperatureMin[i] = T_arr[0]
             self.temperatureMax[i] = T_arr[-1]
+
             
         return self
 

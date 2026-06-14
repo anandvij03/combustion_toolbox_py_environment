@@ -168,7 +168,7 @@ def equilibriumGibbs(self, system, productSpeciesSet, p, T, mix, molesGuess):
                     J22 = np.zeros((NS - NG + 1, NS - NG + 1))
 
                 # Reset removed species to tolMolesGuess
-                N[N[index] < self.tolMoles] = self.tolMolesGuess
+                N[index[N[index] < self.tolMoles]] = self.tolMolesGuess
                 psi_j[indexCondensed] = self.slackGuess
 
                 if counter_errors > 2:

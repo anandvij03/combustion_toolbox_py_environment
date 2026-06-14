@@ -165,7 +165,7 @@ def equilibriumHelmholtz(self, system, productSpeciesSet, v, T, mix, molesGuess)
                 NS = len(index)
 
                 # Reset removed species to tolMolesGuess
-                N[N[index] < self.tolMoles] = self.tolMolesGuess
+                N[index[N[index] < self.tolMoles]] = self.tolMolesGuess
                 psi_j[indexCondensed] = self.slackGuess
 
                 if counter_errors > 2:

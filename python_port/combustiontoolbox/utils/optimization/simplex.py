@@ -170,6 +170,10 @@ def solvePhase(A, b, c, basis, tol, itMax):
         FLAG_POSITIVE = direction > tol
 
         if not np.any(FLAG_POSITIVE):
+            print(f"DEBUG: Simplex Unbounded! Entering index: {entering}")
+            print(f"DEBUG: c[entering]: {c[entering]}")
+            print(f"DEBUG: A[:, entering]: {A[:, entering]}")
+            print(f"DEBUG: b: {b}")
             raise ValueError("simplex:Unbounded: Linear program is unbounded.")
 
         ratios = np.full(m, np.inf)
