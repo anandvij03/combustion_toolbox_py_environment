@@ -135,9 +135,16 @@ def equilibriumGibbs(self, system, productSpeciesSet, p, T, mix, molesGuess):
             # Solve the linear system J*x = b
             try:
                 import scipy.linalg
-                x = scipy.linalg.solve(J, b, assume_a='sym')
+                try:
+                    x = scipy.linalg.solve(J, b, assume_a='sym')
+                except np.linalg.LinAlgError:
+                    x = np.nan * np.ones(b.shape)
             except (ImportError, AttributeError):
-                x = np.linalg.solve(J, b)
+                try:
+                    x = np.linalg.solve(J, b)
+                except np.linalg.LinAlgError:
+                    x = np.nan * np.ones(b.shape)
+
             
             # Check singular matrix
             if np.any(np.isnan(x)) or np.any(np.isinf(x)):

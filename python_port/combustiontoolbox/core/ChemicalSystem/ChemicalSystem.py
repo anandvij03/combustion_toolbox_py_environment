@@ -96,8 +96,19 @@ class ChemicalSystem:
                     self.species[sp] = self.database.species[sp]
                     self.listSpecies.append(sp)
             
+            # Find and add product species matching element signatures
+            products, _ = self.findProducts(self.listSpecies)
+            for sp in products:
+                if sp not in self.listSpecies:
+                    self.species[sp] = self.database.species[sp]
+                    self.listSpecies.append(sp)
+            
+            # Keep list unique and stable-ordered
+            self.listSpecies = list(dict.fromkeys(self.listSpecies))
+            
             self.initialization()
             return self
+
 
         for sp in species_list:
             if sp not in self.listSpecies:
