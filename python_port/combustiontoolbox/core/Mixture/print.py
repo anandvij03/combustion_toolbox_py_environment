@@ -100,13 +100,13 @@ def _print_properties(problemType, numberMixtures, mix_list):
     
     # Property Map: (Label, attribute_name)
     base_props = [
-        ('T [K]', 'temperature'), ('p [bar]', 'pressure'), ('r [kg/m3]', 'density'),
-        ('h [kJ/kg]', 'enthalpy_mass'), ('e [kJ/kg]', 'intEnergy_mass'),
-        ('g [kJ/kg]', 'gibbs_mass'), ('s [kJ/(kg-K)]', 'entropy_mass'),
-        ('W [g/mol]', 'MolecularWeight'), ('(dlV/dlp)T [-]', 'dVdp_T'),
-        ('(dlV/dlT)p [-]', 'dVdT_p'), ('cp [kJ/(kg-K)]', 'cp_mass'),
-        ('gamma [-]', 'adiabaticIndex'), ('gamma_s [-]', 'adiabaticIndex_sound'),
-        ('sound vel [m/s]', 'soundspeed')
+        ('T [K]', 'T'), ('p [bar]', 'p'), ('r [kg/m3]', 'rho'),
+        ('h [kJ/kg]', 'hSpecific'), ('e [kJ/kg]', 'eSpecific'),
+        ('g [kJ/kg]', 'gSpecific'), ('s [kJ/(kg-K)]', 'sSpecific'),
+        ('W [g/mol]', 'MW'), ('(dlV/dlp)T [-]', 'dVdp_T'),
+        ('(dlV/dlT)p [-]', 'dVdT_p'), ('cp [kJ/(kg-K)]', 'cpSpecific'),
+        ('gamma [-]', 'gamma'), ('gamma_s [-]', 'gamma_s'),
+        ('sound vel [m/s]', 'sound')
     ]
     
     for label, prop in base_props:
@@ -190,13 +190,13 @@ def _print_compact_composition(mixCell, listSpecies, units, mintolDisplay):
         mix_obj = mixCell[m]
         unit_lower = units.lower()
         if unit_lower == 'mol':
-            comp_matrix[:, m] = getattr(mix_obj, 'moles', lambda: np.zeros(nSpecies))()
+            comp_matrix[:, m] = getattr(mix_obj, 'N', np.zeros(nSpecies))
             short_label = 'Ni [mol]'
         elif unit_lower == 'molar fraction':
-            comp_matrix[:, m] = getattr(mix_obj, 'moleFractions', lambda: np.zeros(nSpecies))()
+            comp_matrix[:, m] = getattr(mix_obj, 'Xi', np.zeros(nSpecies))
             short_label = 'Xi [-]'
         elif unit_lower == 'mass fraction':
-            comp_matrix[:, m] = getattr(mix_obj, 'massFractions', lambda: np.zeros(nSpecies))()
+            comp_matrix[:, m] = getattr(mix_obj, 'Yi', np.zeros(nSpecies))
             short_label = 'Yi [-]'
         else:
             raise ValueError(f"Unsupported composition unit: {units}")
@@ -239,13 +239,13 @@ def _print_compact_composition(mixCell, listSpecies, units, mintolDisplay):
 def _print_composition_sequential(mix_obj, listSpecies, units, header, mintolDisplay):
     unit_lower = units.lower()
     if unit_lower == 'mol':
-        variable = np.array(getattr(mix_obj, 'moles', lambda: [])())
+        variable = np.array(getattr(mix_obj, 'N', []))
         short_label = 'Ni [mol]\n'
     elif unit_lower == 'molar fraction':
-        variable = np.array(getattr(mix_obj, 'moleFractions', lambda: [])())
+        variable = np.array(getattr(mix_obj, 'Xi', []))
         short_label = '  Xi [-]\n'
     elif unit_lower == 'mass fraction':
-        variable = np.array(getattr(mix_obj, 'massFractions', lambda: [])())
+        variable = np.array(getattr(mix_obj, 'Yi', []))
         short_label = '  Yi [-]\n'
 
     sys.stdout.write(f"{header}{short_label}")
