@@ -8,7 +8,8 @@
 # See wiki or setListspecies method from ChemicalSystem class for predefined
 # sets of species
 #
-# @author: Alberto Cuadra Lara
+# @author: Anand V
+
 #
 # Last update October 06 2025
 # -------------------------------------------------------------------------
