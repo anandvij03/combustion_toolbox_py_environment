@@ -166,7 +166,7 @@ class Mixture:
         """Get equilibrium solver object"""
         if self._equilibriumSolver_ is None:
             from combustiontoolbox.core.CaloricGasModel.CaloricGasModel import CaloricGasModel
-            from combustiontoolbox.equilibrium.EquilibriumSolver import EquilibriumSolver
+            from combustiontoolbox.equilibrium.EquilibriumSolver.EquilibriumSolver import EquilibriumSolver
             
             caloricGasModel = CaloricGasModel.THERMALLY_PERFECT
             self._equilibriumSolver_ = EquilibriumSolver(caloricGasModel=caloricGasModel, FLAG_RESULTS=False)
