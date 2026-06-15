@@ -110,8 +110,16 @@ def _print_properties(problemType, numberMixtures, mix_list):
     ]
     
     for label, prop in base_props:
-        vals = tuple(_get_properties(prop, numberMixtures, mix_list))
-        sys.stdout.write((f"{label:<15}|" + string_value) % vals)
+        vals = list(_get_properties(prop, numberMixtures, mix_list))
+        
+        # Apply scaling to match MATLAB's displayed units
+        if '[kJ/' in label:
+            vals = [v / 1000.0 for v in vals]
+        elif '[g/mol]' in label:
+            vals = [v * 1000.0 for v in vals]
+            
+        sys.stdout.write((f"{label:<15}|" + string_value) % tuple(vals))
+
 
     # Problem-Specific Blocks
     if 'SHOCK' in problemType or 'DET' in problemType:
@@ -213,9 +221,9 @@ def _print_compact_composition(mixCell, listSpecies, units, mintolDisplay):
         major_names = major_names[idxSort]
 
     # Print composition header
-    sys.stdout.write(f"{'COMPOSITION':<15}{short_label}")
+    sys.stdout.write(f"{'COMPOSITION':<15}")
     for _ in range(numMixtures):
-        sys.stdout.write(f"   {short_label:>12}")
+        sys.stdout.write(f"{short_label:>15}   ")
     sys.stdout.write('\n')
 
     # Print major species
@@ -227,9 +235,10 @@ def _print_compact_composition(mixCell, listSpecies, units, mintolDisplay):
     # Print MINORS
     minor_mask = ~major_mask
     Nminor = np.sum(minor_mask)
-    minor_values = np.sum(comp_matrix[minor_mask, :], axis=0)
-    sys.stdout.write(f"{f'MINORS[+{Nminor}]':<16}")
-    sys.stdout.write(line_fmt % tuple(minor_values))
+    if Nminor > 0:
+        minor_values = np.sum(comp_matrix[minor_mask, :], axis=0)
+        sys.stdout.write(f"{f'MINORS[+{Nminor}]':<16}")
+        sys.stdout.write(line_fmt % tuple(minor_values))
 
     # Print TOTAL
     totals = np.sum(comp_matrix, axis=0)
