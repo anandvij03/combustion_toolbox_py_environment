@@ -1,56 +1,52 @@
 import numpy as np
-# Assuming your ported classes are structured like this:
-from combustiontoolbox.databases import BurcatDatabase
-from combustiontoolbox.core.Mixture import Mixture
-from combustiontoolbox.core.ChemicalSystem import ChemicalSystem
-from combustiontoolbox.equilibrium.EquilibriumSolver import EquilibriumSolver
 
-# ---------------------------------------------------------
-# 1. Initialize the Database and Chemical System
-# ---------------------------------------------------------
-# Load the database you converted earlier
-db = BurcatDatabase("databases/thermo_millennium_2_thermoNASA9.inp")
+# Package imports (Keep whatever import style successfully resolved your last error)
+from combustiontoolbox.databases.NasaDatabase.NasaDatabase import NasaDatabase
+from combustiontoolbox.core import ChemicalSystem, Mixture
+from combustiontoolbox.equilibrium.EquilibriumSolver.EquilibriumSolver import EquilibriumSolver
 
-# Define the pool of potential products you want to consider
-species_list = ["CH4", "O2", "N2", "CO2", "CO", "H2O", "H2", "OH", "O", "H"]
-system = ChemicalSystem(db, species_list)
+def run_equilibrium_sweep():
+    print("Loading NASA database ...")
+    # 1. Get NASA database instance
+    db = NasaDatabase()
 
-# ---------------------------------------------------------
-# 2. Define the Initial Mixture (Reactants)
-# ---------------------------------------------------------
-# Create a fresh mixture instance bound to your chemical system
-mix = Mixture(system)
+    # 2. Define the chemical system space using the database
+    system = ChemicalSystem(db)
 
-# Set up a stoichiometric Methane/Air mixture: CH4 + 2(O2 + 3.76 N2)
-initial_mole_fractions = {
-    "CH4": 1.0,
-    "O2": 2.0,
-    "N2": 7.52
-}
-mix.set_composition(initial_mole_fractions)
+    # 3. Initialize the baseline mixture
+    mix = Mixture(system)
 
-# Set state variables (e.g., T = 2500 K, P = 101325 Pa)
-mix.T = 2500.0  # Kelvin
-mix.P = 101325.0  # Pascals
+    # 4. Define the chemical state
+    # Your literal port maps MATLAB's set(mix, ...) directly to the mix.set(...) method
+    mix.set(['CH4'], 'fuel', 1)
 
-# ---------------------------------------------------------
-# 3. Instantiate the Solver and Equilibrate
-# ---------------------------------------------------------
-# Configure the solver for a Constant Temperature and Pressure (TP) problem
-solver = EquilibriumSolver(problem_type="TP", tol_gibbs=1e-6)
+    # Use a numpy array for the element-wise division of the oxidizer composition
+    oxidizer_composition = np.array([78.084, 20.9476, 0.9365, 0.0319]) / 20.9476
+    mix.set(['N2', 'O2', 'Ar', 'CO2'], 'oxidizer', oxidizer_composition)
 
-# Run the solver. It returns a new mixture object in chemical equilibrium
-eq_mix = solver.equilibrate(mix)
+    # 5. Define properties and sweep over equivalence ratios
+    # MATLAB '0.5:0.01:5' matches np.arange (we use 5.01 since the upper limit is exclusive)
+    equivalence_ratio_range = np.arange(0.5, 5.01, 0.01)
+    
+    # Retaining your exact camelCase method name and positional argument format
+    mix_array = mix.setProperties(
+        'temperature', 3000, 
+        'pressure', 1 * 1.01325, 
+        'equivalenceRatio', equivalence_ratio_range
+    )
 
-# ---------------------------------------------------------
-# 4. Inspect the Results
-# ---------------------------------------------------------
-print(f"Solver Status/Error Code: {eq_mix.error_problem}")
-print(f"Equilibrium Temperature: {eq_mix.T} K")
+    # 6. Initialize the solver using your literal configuration style
+    solver = EquilibriumSolver(problemType= 'TP')
 
-print("\nEquilibrium Composition (Mole Fractions):")
-for species in species_list:
-    # Safely get the mole fraction of each species from the mixture array
-    x_i = eq_mix.get_mole_fraction(species)
-    if x_i > 1e-5:  # Only print major species
-        print(f"  {species:<5}: {x_i:.5f}")
+    # 7. Solve the state array
+    solver.solveArray(mix_array)
+
+    # 8. Generate report
+    # If your report function is a method inside the solver class:
+    solver.report(mix_array)
+    
+    # Note: If 'report' was ported as a global standalone function instead, 
+    # use: report(solver, mix_array)
+
+if __name__ == "__main__":
+    run_equilibrium_sweep()
