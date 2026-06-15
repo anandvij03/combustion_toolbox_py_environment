@@ -263,6 +263,13 @@ class EquilibriumSolver:
                     legend_axes.legend(labels, fontsize=self.plotConfig.FontSize if self.plotConfig else 10)
             except Exception:
                 pass
+        
+        # Showing the plot
+        try:
+            import matplotlib.pyplot as plt
+            plt.show()
+        except ImportError:
+            pass
 
         return ax2
 

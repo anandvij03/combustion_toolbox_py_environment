@@ -1,7 +1,7 @@
 def check_basis(basis):
-    if basis == 'mi':
+    if basis == 'mi' or basis == 'kg':
         return 'kg'
-    elif basis == 'mw':
+    elif basis == 'mw' or basis == 'mol':
         return 'mol'
     else:
         raise ValueError("Not known basis.")
