@@ -37,3 +37,78 @@ class EquationStateJCZ3(EquationState):
         'O3':   {'r_star': 4.30, 'epsilon_k': 250.0},
         'OH':   {'r_star': 3.30, 'epsilon_k': 80.0},
     }
+
+    def __init__(self, species_list):
+        
+        #Extracts the active mixture's parameters (leaving behind the non-contributing elements) and filters out solid phases.
+        
+        super().__init__()
+        
+        # Fixed JCZ3 Physics Parameters
+        self.alpha = 13.0  # Repulsive stiffness
+        self.m = 6.0       # Attractive exponent
+        self.R0 = 8.31446261815324
+        self.N_A = 6.02214076e23
+        
+        self.num_species = len(species_list)
+        self.eps_k = np.zeros(self.num_species)
+        self.r_star = np.zeros(self.num_species)
+        
+        for i, species in enumerate(species_list):
+            name = species.name
+            
+            # There is one main objective here:
+            # Filter out condensed phases (solids or liquids)
+            # The condensed phase elements are assigned a zero volume, so as to not break
+            # the solver math.
+            if species.phase == 'condensed' or name not in self.JCZ3_DATABASE:
+                self.eps_k[i] = 0.0
+                self.r_star[i] = 0.0
+            else:
+                self.eps_k[i] = self.JCZ3_DATABASE[name]['epsilon_k']
+                # Convert Angstroms to meters for SI unit calculations
+                self.r_star[i] = self.JCZ3_DATABASE[name]['r_star'] * 1e-10
+                
+        # Precalculating the interaction matrices (nxn, Jacobian)
+        self._precompute_interactions()
+
+    def _precompute_interactions(self):
+        
+        #Building the N x N pairwise interaction matrices using Lorentz-Berthelot mixture rules.
+        #These rules define the collision diameter, as well as the energy well for an 'ij'
+        #combination, wherein the case is of two different gases reacting.
+        
+        # e_ij geometric mean
+        # np.outer performs rapid vectorized cross-multiplication
+        self.e_ij = np.sqrt(np.outer(self.eps_k, self.eps_k))
+        
+        # r_ij arithmetic mean
+        # Broadcasting creates the addition matrix without loops
+        r_ij = (self.r_star[:, None] + self.r_star[None, :]) / 2.0
+        
+        # Calculate the collision volume matrix (v_star_ij)
+        self.v_star_ij = (self.N_A / np.sqrt(2.0)) * (r_ij ** 3)
+
+    def _get_mixture_parameters(self, moles_array):
+        
+        #This function calculates mixture well depth (e_0) and collision volume (V_star)
+        #Again, as shown above as well, the reason for vectorizing operations is that this loop
+        # is called hundreds of times during the Gordon-McBride approach with the NR solver (cycle).
+        # The loop based approach would increase runtime significantly.
+        
+        total_gas_moles = np.sum(moles_array)
+        
+        if total_gas_moles <= 1e-16:
+            return 0.0, 0.0
+            
+        # 1. Get current mole fractions
+        x_array = moles_array / total_gas_moles
+        
+        # 2. Build the 2D Probability Matrix (x_i * x_j)
+        x_ij_matrix = np.outer(x_array, x_array)
+        
+        # 3. Vectorized double-summation by multiplying probability by geometry
+        e_0 = np.sum(x_ij_matrix * self.e_ij)
+        V_star = np.sum(x_ij_matrix * self.v_star_ij)
+        
+        return e_0, V_star
