@@ -120,7 +120,7 @@ class EquationStateJCZ3(EquationState):
         n_g = np.sum(moles_array)
         x = moles_array / n_g
     
-        # e0_bar_k = weighted interaction of species k with the mixture
+        #e0_bar_k = weighted interaction of species k with the mixture
         e0_bar = self.e_ij @ x          # shape (n_species,)
         vstar_bar = self.v_star_ij @ x
     
@@ -130,3 +130,27 @@ class EquationStateJCZ3(EquationState):
         d_Vstar_dnk = (2.0/n_g) * (vstar_bar-V_star)
     
         return d_e0_dnk, d_Vstar_dnk
+
+    def _get_df_de0(self, e_0, V_star, n_g, V, T, de=None):
+        #∂f/∂e0, holding V*, n_g, V, T fixed
+        de = de or max(1e-6 * abs(e_0), 1e-8)
+        f_plus  = self._get_f(e_0 + de, V_star, n_g, V, T)
+        f_minus = self._get_f(e_0 - de, V_star, n_g, V, T)
+        return (f_plus - f_minus) / (2 * de)
+
+    def _get_df_dVstar(self, e_0, V_star, n_g, V, T, dV=None):
+        #∂f/∂V*, holding e0, n_g, V, T fixed
+        dV = dV or max(1e-6 * abs(V_star), 1e-12)
+        f_plus  = self._get_f(e_0, V_star + dV, n_g, V, T)
+        f_minus = self._get_f(e_0, V_star - dV, n_g, V, T)
+        return (f_plus - f_minus) / (2 * dV)
+
+    def _get_df_dn(self, e_0, V_star, n_g, V, T, dn=None):
+        """∂f/∂n (total gas moles), holding e0, V*, V, T fixed.
+        The necessity of this term is not settled yet, due to a change in
+        how the algorithm works, updated in a Sandia JCZ3 paper in 2025. 
+        The function can easily be removed if validation details do not hold up."""
+        dn = dn or max(1e-6 * abs(n_g), 1e-10)
+        f_plus  = self._get_f(e_0, V_star, n_g + dn, V, T)
+        f_minus = self._get_f(e_0, V_star, n_g - dn, V, T)
+        return (f_plus - f_minus) / (2 * dn)
