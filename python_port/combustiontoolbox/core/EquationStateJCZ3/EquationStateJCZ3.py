@@ -1,3 +1,6 @@
+from combustiontoolbox.core import MixtureConfig
+from combustiontoolbox.core import MixtureConfig
+from combustiontoolbox.core.MixtureConfig import MixtureConfig
 import numpy as np
 from combustiontoolbox.core.EquationState.EquationState import EquationState
 from combustiontoolbox.common.Constants import Constants
@@ -112,3 +115,18 @@ class EquationStateJCZ3(EquationState):
         V_star = np.sum(x_ij_matrix * self.v_star_ij)
         
         return e_0, V_star
+    
+    def _get_composition_derivatives(self, moles_array):
+        n_g = np.sum(moles_array)
+        x = moles_array / n_g
+    
+        # e0_bar_k = weighted interaction of species k with the mixture
+        e0_bar = self.e_ij @ x          # shape (n_species,)
+        vstar_bar = self.v_star_ij @ x
+    
+        e_0, V_star = self._get_mixture_parameters(moles_array)
+    
+        d_e0_dnk    = (2.0/n_g) * (e0_bar-e_0)
+        d_Vstar_dnk = (2.0/n_g) * (vstar_bar-V_star)
+    
+        return d_e0_dnk, d_Vstar_dnk
