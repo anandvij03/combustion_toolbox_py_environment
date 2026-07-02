@@ -52,7 +52,8 @@ class EquationStateJCZ3(EquationState):
         self.m = 6.0       # Attractive exponent
         self.R0 = Constants.R0
         self.N_A = Constants.NA
-        
+        self.l - 13.0
+        self.c = 0.577216 # Euler Mascheroni Constant
         self.num_species = len(species_list)
         self.eps_k = np.zeros(self.num_species)
         self.r_star = np.zeros(self.num_species)
@@ -200,18 +201,19 @@ class EquationStateJCZ3(EquationState):
         a1, a2, a3 = 2.96192, 7.12865, 12.4511
         l, m, R0 = self.l, self.m, self.R0
         z = l * (V_star/V)**(-1.0/3.0)
+        c1 = self.c - self.l
 
         if n_g <= 1e-16 or e_0 <= 0:
             return 1.0  # Ideal-Gas fallback. This implies there will be no excess contribution.
 
 
-        F_therm = self.c1 - np.log(T * (l - m) / (m * (e_0 / (n_g * R0))))
+        F_therm = c1 - np.log(T * (l - m) / (m * (e_0 / (n_g * R0))))
         y = (V_star/V) * (F_therm / l) ** 3
         f_g = 1.0 + a1 * y + a2 * y**2 + a3 * y**3
 
-        g = (e_0 / (n_g * R0 * T)) * (m / (l - m)) * (z / np.pi) * (z - 2.0) * np.exp(l - z)
-        # g must be >= 0 for f_s to be real (it's a physical density regime check).
-        f_s = 2.0 * g ** 1.5 if g > 0 else 0.0
+        g = (e_0/(n_g*R0*T)) * (m/(l-m)) * (z/np.pi) * (z-2.0) * np.exp(l-z)
+        #A physical density regime check implies that g >= 0 for f-s to be real. This is implemented below.
+        f_s = 2.0 * g ** (3.0/2.0) if g > 0 else 0.0
         f = f_g + f_s
         return f
 
