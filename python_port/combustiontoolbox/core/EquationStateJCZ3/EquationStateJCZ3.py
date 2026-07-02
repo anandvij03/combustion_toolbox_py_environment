@@ -105,11 +105,9 @@ class EquationStateJCZ3(EquationState):
             return 0.0, 0.0
             
         # 1. Get current mole fractions
-        x_array = moles_array / total_gas_moles
-        
-        # 2. Build the 2D Probability Matrix (x_i * x_j)
+        x_array = moles_array / total_gas_moles   
+        # 2. Build the 2D Probability Matrix (x_i*x_j)
         x_ij_matrix = np.outer(x_array, x_array)
-        
         # 3. Vectorized double-summation by multiplying probability by geometry
         e_0 = total_gas_moles * np.sum(x_ij_matrix * self.e_ij) # Multiplying by n gives us the correct extensive form
         V_star = total_gas_moles * np.sum(x_ij_matrix * self.v_star_ij) # Multiplying by n gives us the correct extensive form
@@ -157,14 +155,13 @@ class EquationStateJCZ3(EquationState):
         return (f_plus - f_minus) / (2 * dn)
 
     def _get_E0(self, e_0, V_star, V):
-        """
-        Calculates the baseline Lattice Energy (E0) for the JCZ3 EOS.
-        """
+        
+        #Calculates the baseline Lattice Energy (E0) for the JCZ3 EOS.
         # Fixed JCZ3 parameters
         m = 6.0
-        l = 13.0
-        B_m = 14.45392
-        B_l = 13.99166
+        l = 13.0 # Fixed stiffness due to numerical instabilities.
+        B_m = 14.45392 # Repulsive stiffness.
+        B_l = 13.99166 # Attractive stiffness.
         
         # Scaling factor: s = (m*l) / (2*(l-m))
         s = (l*m)/(2*(l-m)) 
@@ -182,3 +179,80 @@ class EquationStateJCZ3(EquationState):
         z = s * (r_l - r_m)
         E_0 = e_0 * z
         return E_0
+
+
+    # CODE TO STILL BE CHECKED
+
+    def _get_f(self, e_0, V_star, n_g, V, T):
+        """ This rests on the principle that f = f_g(y) + f_s(z) (Taken from the Sandia JCZ3 Report)
+        The function itself takes inputs of e_0, V_star, n_g.
+        The other relations are given below, regarding the obtaining of the f parameter. 
+        """
+        #Obtaining f_g. f_g is a low density term and is expressed as a consequence of virial coefficients.
+        # f_g = 1 + a1*y + a2*y^2 + a3*y^3
+        # The values of a1, a2, a3 have been taken from similar values used in the TIGER code, earlier.
+        # y = (V*/V)*(F_th//l)^3, where:
+        # F_th = c1 - ln(T*(l-m)/(m*(e_0/(n_g*R0)))).
+        # Here, c1 is given as c + l, with c being the Euler Mascheroni Constant (0.577216).
+        # To find f_s, we do the following:
+        # f_s = 2*((e_0/(n_g*R0*T))*(m/(l-m))*(z/pi)*(z-2)*exp(l-z))^3/2
+
+        a1, a2, a3 = 2.96192, 7.12865, 12.4511
+        l, m, R0 = self.l, self.m, self.R0
+        z = l * (V_star/V)**(-1.0/3.0)
+
+        if n_g <= 1e-16 or e_0 <= 0:
+            return 1.0  # Ideal-Gas fallback. This implies there will be no excess contribution.
+
+
+        F_therm = self.c1 - np.log(T * (l - m) / (m * (e_0 / (n_g * R0))))
+        y = (V_star/V) * (F_therm / l) ** 3
+        f_g = 1.0 + a1 * y + a2 * y**2 + a3 * y**3
+
+        g = (e_0 / (n_g * R0 * T)) * (m / (l - m)) * (z / np.pi) * (z - 2.0) * np.exp(l - z)
+        # g must be >= 0 for f_s to be real (it's a physical density regime check).
+        f_s = 2.0 * g ** 1.5 if g > 0 else 0.0
+        f = f_g + f_s
+        return f
+
+    def getDepartureFunctions(self, moles_array, V, T):
+        """
+        Calculates the excess chemical potential array (mu_k^excess) for all species.
+        Returns a NumPy array of size (num_species,).
+        """
+        n_g = np.sum(moles_array)
+        if n_g <= 1e-16:
+            return np.zeros_like(moles_array)
+
+        # 1. Base Parameters & Gradients
+        e_0, V_star = self._get_mixture_parameters(moles_array)
+        d_e0_dnk, d_Vstar_dnk = self._get_composition_derivatives(moles_array)
+
+        # 2. Lattice Energy Derivatives (Analytical)
+        # Remember to apply the extensive n_g * R0 scale here just like in _get_E0
+        dE0_de0, dE0_dVstar = self._get_E0_param_derivatives(e_0, V_star, V, n_g)
+
+        # 3. Thermal Function Derivatives (Numerical Wrappers)
+        f_val = self._get_f(e_0, V_star, V, T)
+        f_e0 = self._get_df_de0(e_0, V_star, n_g, V, T)
+        f_Vstar = self._get_df_dVstar(e_0, V_star, n_g, V, T)
+
+        # 4. Master Assembly (The Chain Rule)
+        RT = self.R0 * T
+        nRT_over_f = (n_g * RT) / f_val
+        
+        # e_0 branch
+        bracket_e0 = dE0_de0 + (nRT_over_f * f_e0)
+        term_e0 = bracket_e0 * d_e0_dnk
+        
+        # V* branch
+        bracket_Vstar = dE0_dVstar + (nRT_over_f * f_Vstar)
+        term_Vstar = bracket_Vstar * d_Vstar_dnk
+        
+        # Base thermal log
+        term_thermal_base = RT * np.log(f_val)
+
+        # Final array
+        mu_excess = term_e0 + term_Vstar + term_thermal_base
+        
+        return mu_excess
