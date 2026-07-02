@@ -274,6 +274,9 @@ class EquationStateJCZ3(EquationState):
 
 
     def getDepartureFunctions(self, moles_array, V, T):
+
+        # Add comments here
+        
         mu_excess = 0
         n_g = np.sum(moles_array)
         e_0, V_star = self._get_mixture_parameters(moles_array)
