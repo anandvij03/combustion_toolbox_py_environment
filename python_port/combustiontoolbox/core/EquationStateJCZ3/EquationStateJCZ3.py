@@ -111,8 +111,8 @@ class EquationStateJCZ3(EquationState):
         x_ij_matrix = np.outer(x_array, x_array)
         
         # 3. Vectorized double-summation by multiplying probability by geometry
-        e_0 = np.sum(x_ij_matrix * self.e_ij)
-        V_star = np.sum(x_ij_matrix * self.v_star_ij)
+        e_0 = total_gas_moles * np.sum(x_ij_matrix * self.e_ij) # Multiplying by n gives us the correct extensive form
+        V_star = total_gas_moles * np.sum(x_ij_matrix * self.v_star_ij) # Multiplying by n gives us the correct extensive form
         
         return e_0, V_star
     
