@@ -52,7 +52,7 @@ class EquationStateJCZ3(EquationState):
         self.m = 6.0       # Attractive exponent
         self.R0 = Constants.R0
         self.N_A = Constants.NA
-        self.l - 13.0
+        self.l = 13.0
         self.c = 0.577216 # Euler Mascheroni Constant
         self.num_species = len(species_list)
         self.eps_k = np.zeros(self.num_species)
@@ -181,15 +181,12 @@ class EquationStateJCZ3(EquationState):
         E_0 = e_0 * z
         return E_0
 
-
-    # CODE TO STILL BE CHECKED
-
     def _get_f(self, e_0, V_star, n_g, V, T):
-        """ This rests on the principle that f = f_g(y) + f_s(z) (Taken from the Sandia JCZ3 Report)
-        The function itself takes inputs of e_0, V_star, n_g.
-        The other relations are given below, regarding the obtaining of the f parameter. 
-        """
-        #Obtaining f_g. f_g is a low density term and is expressed as a consequence of virial coefficients.
+        #This rests on the principle that f = f_g(y) + f_s(z) (Taken from the Sandia JCZ3 Report)
+        #The function itself takes inputs of e_0, V_star, n_g.
+        #The other relations are given below, regarding the obtaining of the f parameter. 
+        
+        #Obtaining f_g: f_g is a low density term and is expressed as a consequence of virial coefficients.
         # f_g = 1 + a1*y + a2*y^2 + a3*y^3
         # The values of a1, a2, a3 have been taken from similar values used in the TIGER code, earlier.
         # y = (V*/V)*(F_th//l)^3, where:
@@ -218,28 +215,28 @@ class EquationStateJCZ3(EquationState):
         return f
 
     def getDepartureFunctions(self, moles_array, V, T):
-        """
-        Calculates the excess chemical potential array (mu_k^excess) for all species.
-        Returns a NumPy array of size (num_species,).
-        """
+        
+        #Calculates the excess chemical potential array (mu_k^excess) for all species.
+        #Returns a NumPy array of size (num_species,).
+        
         n_g = np.sum(moles_array)
         if n_g <= 1e-16:
             return np.zeros_like(moles_array)
 
-        # 1. Base Parameters & Gradients
+        #1. Base Parameters & Gradients
         e_0, V_star = self._get_mixture_parameters(moles_array)
         d_e0_dnk, d_Vstar_dnk = self._get_composition_derivatives(moles_array)
 
-        # 2. Lattice Energy Derivatives (Analytical)
+        #2. Lattice Energy Derivatives (Analytical)
         # Remember to apply the extensive n_g * R0 scale here just like in _get_E0
         dE0_de0, dE0_dVstar = self._get_E0_param_derivatives(e_0, V_star, V, n_g)
 
-        # 3. Thermal Function Derivatives (Numerical Wrappers)
-        f_val = self._get_f(e_0, V_star, V, T)
+        #3. Thermal Function Derivatives (Numerical Wrappers)
+        f_val = self._get_f(e_0, V_star, n_g, V, T)
         f_e0 = self._get_df_de0(e_0, V_star, n_g, V, T)
         f_Vstar = self._get_df_dVstar(e_0, V_star, n_g, V, T)
 
-        # 4. Master Assembly (The Chain Rule)
+        #4. Master Assembly (The Chain Rule)
         RT = self.R0 * T
         nRT_over_f = (n_g * RT) / f_val
         
@@ -257,4 +254,33 @@ class EquationStateJCZ3(EquationState):
         # Final array
         mu_excess = term_e0 + term_Vstar + term_thermal_base
         
+        return mu_excess
+
+# Self Written
+
+    def _get_P0(self, E_0, e_0, V_star, V):
+        # This is a function to get the Lattice Pressure value for the given equation and state parameters. This allows to do two things:
+        # 1. The Lattice Pressure is required for calculating the excess chemical potential (due to non-ideal behaviour, modelled by the JCZ3 equation).
+        # 2. THe Lattice Pressure is also required for obtaining the final detonation pressure, once the other state values have been obtained.
+        
+        # The aim is to differentiate E0 and V
+
+        return True
+
+
+    def getDepartureFunctions(self, moles_array, V, T):
+        mu_excess = 0
+        n_g = np.sum(moles_array)
+        e_0, V_star = self._get_mixture_parameters(moles_array)
+        E_0_var = self._get_E0(e_0,V_star,V)
+        f_var = self._get_f(e_0,V_star,n_g,V,T)
+        f_e0 = self._get_df_de0(e_0,V_star,n_g,V,T)
+        df_de_0 = self._get_df_de0(e_0,V_star,n_g,V,T)
+        df_dV_star = self._get_df_dVstar(e_0,V_star,n_g,V,T)
+        df_dn = self._get_df_dn(e_0,V_star,n_g,V,T)
+        P_0_var = self._get_P0(E_0_var,e_0,V_star,V)
+        d_e0_dnk, d_Vstar_dnk = self._get_composition_derivatives(moles_array)
+
+        mu_excess = ((E_0_var/e_0) + (n_g*self.R0*T)/(f_var)*(df_de_0))*d_e0_dnk + ((V/V_star)*P_0_var + (n_g*self.R0*T*df_dV_star)/(f_var))*d_Vstar_dnk + (self.R0)*T*np.log(f_var) + ((self.R0*T*n_g)/f_var)*df_dn
+
         return mu_excess
