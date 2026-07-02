@@ -48,10 +48,10 @@ class EquationStateJCZ3(EquationState):
         super().__init__()
         
         # Fixed JCZ3 Physics Parameters
-        self.alpha = 13.0  # Repulsive stiffness
+        self.alpha = 13.0  # Repulsive stiffness (Constrained Due to numerical Instabilities at Higher Pressures)
         self.m = 6.0       # Attractive exponent
-        self.R0 = 8.31446261815324
-        self.N_A = 6.02214076e23
+        self.R0 = Constants.R0
+        self.N_A = Constants.NA
         
         self.num_species = len(species_list)
         self.eps_k = np.zeros(self.num_species)
@@ -83,7 +83,7 @@ class EquationStateJCZ3(EquationState):
         
         # e_ij geometric mean
         # np.outer performs rapid vectorized cross-multiplication
-        self.e_ij = np.sqrt(np.outer(self.eps_k, self.eps_k))
+        self.e_ij = self.R0 * np.sqrt(np.outer(self.eps_k, self.eps_k))
         
         # r_ij arithmetic mean
         # Broadcasting creates the addition matrix without loops
@@ -116,6 +116,7 @@ class EquationStateJCZ3(EquationState):
         
         return e_0, V_star
     
+ 
     def _get_composition_derivatives(self, moles_array):
         n_g = np.sum(moles_array)
         x = moles_array / n_g
@@ -146,11 +147,38 @@ class EquationStateJCZ3(EquationState):
         return (f_plus - f_minus) / (2 * dV)
 
     def _get_df_dn(self, e_0, V_star, n_g, V, T, dn=None):
-        """∂f/∂n (total gas moles), holding e0, V*, V, T fixed.
-        The necessity of this term is not settled yet, due to a change in
-        how the algorithm works, updated in a Sandia JCZ3 paper in 2025. 
-        The function can easily be removed if validation details do not hold up."""
+        #∂f/∂n (total gas moles), holding e0, V*, V, T fixed.
+        #The necessity of this term is not settled yet, due to a change in
+        #how the algorithm works, updated in a Sandia JCZ3 paper in 2025. 
+        #The function can easily be removed if validation details do not hold up."""
         dn = dn or max(1e-6 * abs(n_g), 1e-10)
         f_plus  = self._get_f(e_0, V_star, n_g + dn, V, T)
         f_minus = self._get_f(e_0, V_star, n_g - dn, V, T)
         return (f_plus - f_minus) / (2 * dn)
+
+    def _get_E0(self, e_0, V_star, V):
+        """
+        Calculates the baseline Lattice Energy (E0) for the JCZ3 EOS.
+        """
+        # Fixed JCZ3 parameters
+        m = 6.0
+        l = 13.0
+        B_m = 14.45392
+        B_l = 13.99166
+        
+        # Scaling factor: s = (m*l) / (2*(l-m))
+        s = (l*m)/(2*(l-m)) 
+        
+        # Geometrical volume ratios
+        # Note: Repulsion scales with (V/V*), Attraction scales with (V*/V)
+        vol_ratio_rep = (V / V_star)**(1.0 / 3.0)
+        vol_ratio_att = (V_star / V)**(m/3.0)
+        
+        # Compute individual branch forces
+        r_l = (B_l/l) * np.exp(l * (1.0 - vol_ratio_rep))
+        r_m = (B_m/m) * vol_ratio_att
+        
+        # Assembly
+        z = s * (r_l - r_m)
+        E_0 = e_0 * z
+        return E_0
