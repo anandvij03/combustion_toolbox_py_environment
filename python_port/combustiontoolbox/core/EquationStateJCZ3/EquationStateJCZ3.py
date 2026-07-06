@@ -41,7 +41,7 @@ class EquationStateJCZ3(EquationState):
         'OH':   {'r_star': 3.30, 'epsilon_k': 80.0},
     }
 
-    def __init__(self, species_list):
+    def __init__(self, species_names, index_condensed):
         
         #Extracts the active mixture's parameters (leaving behind the non-contributing elements) and filters out solid phases.
         
@@ -54,18 +54,17 @@ class EquationStateJCZ3(EquationState):
         self.N_A = Constants.NA
         self.l = 13.0
         self.c = 0.577216 # Euler Mascheroni Constant
-        self.num_species = len(species_list)
+        self.num_species = len(species_names)
         self.eps_k = np.zeros(self.num_species)
         self.r_star = np.zeros(self.num_species)
         
-        for i, species in enumerate(species_list):
-            name = species.name
+        for i, name in enumerate(species_names):
             
             # There is one main objective here:
             # Filter out condensed phases (solids or liquids)
             # The condensed phase elements are assigned a zero volume, so as to not break
             # the solver math.
-            if species.phase == 'condensed' or name not in self.JCZ3_DATABASE:
+            if i in index_condensed or name not in self.JCZ3_DATABASE:
                 self.eps_k[i] = 0.0
                 self.r_star[i] = 0.0
             else:
