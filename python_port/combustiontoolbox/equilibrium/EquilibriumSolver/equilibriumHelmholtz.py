@@ -130,7 +130,9 @@ def equilibriumHelmholtz(self, system, productSpeciesSet, v, T, mix, molesGuess)
             FLAG_JCZ3 = True
             if FLAG_JCZ3 == True:
                 # To be Removed: This has to be replaced with instantiation in the example file itself.
-                jcz3_model = EquationStateJCZ3(species_names=productSpeciesSet.names, index_condensed=indexCondensed)
+                # Get the exact names of the active products in the correct order
+                jcz3_names = [system.listSpecies[i] for i in productSpeciesSet.indexGlobal]
+                jcz3_model = EquationStateJCZ3(species_names=jcz3_names, index_condensed=indexCondensed)
                 # Excess Chemical Potential (mu_excess)
                 mu_excess = jcz3_model.getDepartureFunctions(N,v,T)
                 muRT[indexGas] += mu_excess[indexGas]/ RT
