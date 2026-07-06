@@ -292,3 +292,19 @@ class EquationStateJCZ3(EquationState):
         mu_excess = ((E_0_var/e_0) + (n_g*self.R0*T)/(f_var)*(df_de_0))*d_e0_dnk + ((V/V_star)*P_0_var + (n_g*self.R0*T*df_dV_star)/(f_var))*d_Vstar_dnk + (self.R0)*T*np.log(f_var) + ((self.R0*T*n_g)/f_var)*df_dn
 
         return mu_excess
+
+    # Dummy Functions to reduce abstract class errors:
+    def getPressure(self, *args, **kwargs):
+        raise NotImplementedError("JCZ3 getPressure not yet implemented.")
+
+    def getVolume(self, *args, **kwargs):
+        raise NotImplementedError("JCZ3 getVolume not yet implemented.")
+
+    def getPressureDerivativesDimensional(self, *args, **kwargs):
+        raise NotImplementedError("JCZ3 getPressureDerivativesDimensional not yet implemented.")
+        
+    def getVolumeDerivatives(self, *args, **kwargs):
+        raise NotImplementedError("JCZ3 getVolumeDerivatives not yet implemented.")
+        
+    def getTemperature(self, *args, **kwargs):
+        raise NotImplementedError("JCZ3 getTemperature not yet implemented.")

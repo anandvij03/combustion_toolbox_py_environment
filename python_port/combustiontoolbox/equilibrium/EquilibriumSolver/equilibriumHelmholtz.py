@@ -1,6 +1,7 @@
 import numpy as np
 import warnings
 from combustiontoolbox.common.Constants import Constants
+from combustiontoolbox.core.EquationStateJCZ3.EquationStateJCZ3 import EquationStateJCZ3
 
 def equilibriumHelmholtz(self, system, productSpeciesSet, v, T, mix, molesGuess):
     """
@@ -128,8 +129,10 @@ def equilibriumHelmholtz(self, system, productSpeciesSet, v, T, mix, molesGuess)
             # 2. Non-Ideal (Excess) contribution via toggle. This can be switched off for convenience.
             FLAG_JCZ3 = True
             if FLAG_JCZ3 == True:
+                # To be Removed: This has to be replaced with instantiation in the example file itself.
+                jcz3_model = EquationStateJCZ3(species_list=system.species)
                 # Excess Chemical Potential (mu_excess)
-                mu_excess = mix.e
+                mu_excess = jcz3_model.getDepartureFunctions(N,v,T)
                 muRT[indexGas] += mu_excess[indexGas]/ RT
 
             # Compute total number of moles
