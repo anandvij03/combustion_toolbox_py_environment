@@ -121,8 +121,17 @@ def equilibriumHelmholtz(self, system, productSpeciesSet, v, T, mix, molesGuess)
         while STOP > self.tolGibbs and it < itMax:
             it += 1
             # Chemical potential
+            # Code for adding the non-ideal chemical potential as well, is given here.
+            # 1. Ideal gas mu (baseline)
             muRT[indexGas] = g0RT[indexGas] + np.log(N[indexGas] * RT / v * 1e-5)
             
+            # 2. Non-Ideal (Excess) contribution via toggle. This can be switched off for convenience.
+            FLAG_JCZ3 = True
+            if FLAG_JCZ3 == True:
+                # Excess Chemical Potential (mu_excess)
+                mu_excess = mix.e
+                muRT[indexGas] += mu_excess[indexGas]/ RT
+
             # Compute total number of moles
             NP = np.sum(N[indexGas])
             
