@@ -264,7 +264,7 @@ class EquationStateJCZ3(EquationState):
         
         # The aim is to differentiate E0 and V (P0 is -dE0/dv)
     
-        dV = dV or max(1e-6 * abs(V), 1e-12)
+        dV = max(1e-6 * abs(V), 1e-12)
         E0_plus  = self._get_E0(e_0, V_star, V + dV)
         E0_minus = self._get_E0(e_0, V_star, V - dV)
         return -(E0_plus - E0_minus) / (2.0 * dV)

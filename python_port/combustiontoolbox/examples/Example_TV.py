@@ -17,7 +17,7 @@ mix.set(['CH4'], 'fuel', 1)
 mix.set(['N2', 'O2', 'Ar', 'CO2'], 'oxidizer', np.array([78.084, 20.9476, 0.9365, 0.0319]) / 20.9476)
 
 # Define properties
-mixArray = mix.setProperties('temperature', 3000, 'volume', 1, 'equivalenceRatio', np.arange(0.5, 5.01, 0.01))
+mixArray = mix.setProperties('temperature', 10000, 'volume', 0.01, 'equivalenceRatio', np.arange(3.80, 5.01, 0.01))
 
 # Initialize solver
 solver = EquilibriumSolver(problemType='TV')
