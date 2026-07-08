@@ -126,6 +126,7 @@ def equilibriumHelmholtz(self, system, productSpeciesSet, v, T, mix, molesGuess)
             # 1. Ideal gas mu (baseline)
             muRT[indexGas] = g0RT[indexGas] + np.log(N[indexGas] * RT / v * 1e-5)
             
+            #ADDED CODE
             # 2. Non-Ideal (Excess) contribution via toggle. This can be switched off for convenience.
             FLAG_JCZ3 = True
             if FLAG_JCZ3 == True:
