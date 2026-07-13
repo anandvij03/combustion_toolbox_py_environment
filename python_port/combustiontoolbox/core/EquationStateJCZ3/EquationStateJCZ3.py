@@ -307,15 +307,20 @@ class EquationStateJCZ3(EquationState):
         RT = self.R0 * T
 
         # TODO: Implement the cross derivatives, which involves differentiating the terms in getDepartureFunctions()
-        
-        
-        d2fg_dni_dnj = 0
-        d2fs_dni_dnj = 0
-        d2E0_dnj_dni = 0
+        fg = 0 # Placeholder
+        fs = 0 # Placeholder
+        f_var = fg + fs
+        dfg_dni = 0 # Placeholder
+        dfs_dni = 0 # Placeholder
+        dfg_dnj = 0 # Placeholder
+        dfs_dnj = 0 # Placeholder
+        d2fg_dni_dnj = 0 # Placeholder
+        d2fs_dni_dnj = 0 # Placeholder
+        d2E0_dnj_dni = 0 # Placeholder
 
         # dI_dni, dI_dnj
-        dI_dni = 0
-        dI_dnj = 0
+        dI_dni = (1.0 / f_var) * (dfg_dni + dfs_dni)
+        dI_dnj = (1.0 / f_var) * (dfg_dnj + dfs_dnj)
 
         # d2_I_dni_dnj 
         d2I_dni_dnj = (1.0/(n_g**2))*(-(n_g * dI_dni) * (n_g * dI_dnj) + ((n_g**2) / f_var) * (d2fg_dni_dnj + d2fs_dni_dnj))
