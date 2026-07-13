@@ -304,7 +304,33 @@ class EquationStateJCZ3(EquationState):
         if n_g <= 1e-16:
             return J_excess
         
+        RT = self.R0 * T
+
         # TODO: Implement the cross derivatives, which involves differentiating the terms in getDepartureFunctions()
+        
+        
+        d2fg_dni_dnj = 0
+        d2fs_dni_dnj = 0
+        d2E0_dnj_dni = 0
+
+        # dI_dni, dI_dnj
+        dI_dni = 0
+        dI_dnj = 0
+
+        # d2_I_dni_dnj 
+        d2I_dni_dnj = (1.0/(n_g**2))*(-(n_g * dI_dni) * (n_g * dI_dnj) + ((n_g**2) / f_var) * (d2fg_dni_dnj + d2fs_dni_dnj))
+        
+
+
+        # Equation (A68) dGamma_dln_nj
+        # Gamma = mu_excess/RT (the imperfection factor)
+        # I = ln(f), and f = f_s + f_g
+        dGamma_i_dln_nj = (1.0 / n_g) * (
+            (n_g / RT) * d2E0_dnj_dni + 
+            n_g * dI_dni + 
+            n_g * dI_dnj + 
+            (n_g**2) * d2I_dni_dnj
+        )
 
 
         return J_excess
