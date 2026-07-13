@@ -255,8 +255,6 @@ class EquationStateJCZ3(EquationState):
         
         return mu_excess
 
-# Self Written
-
     def _get_P0(self, E_0, e_0, V_star, V):
         # This is a function to get the Lattice Pressure value for the given equation and state parameters. This allows to do two things:
         # 1. The Lattice Pressure is required for calculating the excess chemical potential (due to non-ideal behaviour, modelled by the JCZ3 equation).
@@ -292,6 +290,26 @@ class EquationStateJCZ3(EquationState):
 
         return mu_excess
 
+    def getDepartureJacobian(self,moles_array,V,T):
+        # Calculate the Jacobian, which is the matrix of interactions across species. This is indexed by the species i and j
+        # The Jacobian is the hessian of the excess free energy, for the non-ideal chemical potential with respect to species moles.
+        # This returns a dense NS x NS array
+
+        n_g = np.sum(moles_array)
+        num_species = len(moles_array)
+
+        # Initializing the dense matrix
+        J_excess = np.zeros((num_species,num_species))
+
+        if n_g <= 1e-16:
+            return J_excess
+        
+        # TODO: Implement the cross derivatives, which involves differentiating the terms in getDepartureFunctions()
+
+
+        return J_excess
+
+
     # Dummy Functions to reduce abstract class errors:
     def getPressure(self, *args, **kwargs):
         raise NotImplementedError("JCZ3 getPressure not yet implemented.")
@@ -307,3 +325,4 @@ class EquationStateJCZ3(EquationState):
         
     def getTemperature(self, *args, **kwargs):
         raise NotImplementedError("JCZ3 getTemperature not yet implemented.")
+
