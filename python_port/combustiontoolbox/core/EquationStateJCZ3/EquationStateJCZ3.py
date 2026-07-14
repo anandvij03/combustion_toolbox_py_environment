@@ -126,7 +126,7 @@ class EquationStateJCZ3(EquationState):
         # e_0 and V_star are extensive (total mixture)
         e_0, V_star = self._get_mixture_parameters(moles_array)
     
-        d_e0_dnk    = 2.0 * (e0_bar - (e_0/n_g))
+        d_e0_dnk    = 2.0 * e0_bar - (e_0/n_g)
         d_Vstar_dnk = 2.0 * vstar_bar - (V_star/n_g)
     
         return d_e0_dnk, d_Vstar_dnk
