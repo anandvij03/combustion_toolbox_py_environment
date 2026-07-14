@@ -119,17 +119,19 @@ class EquationStateJCZ3(EquationState):
         n_g = np.sum(moles_array)
         x = moles_array / n_g
     
-        #e0_bar_k = weighted interaction of species k with the mixture
+        #e0_bar_k = weighted interaction of species k with the mixture (these are intensive (per mole))
         e0_bar = self.e_ij @ x          # shape (n_species,)
         vstar_bar = self.v_star_ij @ x
     
+        # e_0 and V_star are extensive (total mixture)
         e_0, V_star = self._get_mixture_parameters(moles_array)
     
-        d_e0_dnk    = (2.0/n_g) * (e0_bar-e_0)
-        d_Vstar_dnk = (2.0/n_g) * (vstar_bar-V_star)
+        d_e0_dnk    = 2.0 * (e0_bar - (e_0/n_g))
+        d_Vstar_dnk = 2.0 * vstar_bar - (V_star/n_g)
     
         return d_e0_dnk, d_Vstar_dnk
 
+    # Update Numerical Differentiation to Analytical Differentiation
     def _get_df_de0(self, e_0, V_star, n_g, V, T, de=None):
         #∂f/∂e0, holding V*, n_g, V, T fixed
         de = de or max(1e-6 * abs(e_0), 1e-8)
@@ -148,7 +150,8 @@ class EquationStateJCZ3(EquationState):
         #∂f/∂n (total gas moles), holding e0, V*, V, T fixed.
         #The necessity of this term is not settled yet, due to a change in
         #how the algorithm works, updated in a Sandia JCZ3 paper in 2025. 
-        #The function can easily be removed if validation details do not hold up."""
+        #The function can easily be removed if validation details do not hold up.
+        #The numerical approach can be updated to an analytical approach to avoid truncation errors.
         dn = dn or max(1e-6 * abs(n_g), 1e-10)
         f_plus  = self._get_f(e_0, V_star, n_g + dn, V, T)
         f_minus = self._get_f(e_0, V_star, n_g - dn, V, T)
@@ -203,15 +206,24 @@ class EquationStateJCZ3(EquationState):
             return 1.0  # Ideal-Gas fallback. This implies there will be no excess contribution.
 
 
-        F_therm = c1 - np.log(T * (l - m) / (m * (e_0 / (n_g * R0))))
-        y = (V_star/V) * (F_therm / l) ** 3
+        self.F_therm = c1 - np.log(T * (l - m) / (m * (e_0 / (n_g * R0))))
+        y = (V_star/V) * (self.F_therm / l) ** 3
         f_g = 1.0 + a1 * y + a2 * y**2 + a3 * y**3
 
         g = (e_0/(n_g*R0*T)) * (m/(l-m)) * (z/np.pi) * (z-2.0) * np.exp(l-z)
         #A physical density regime check implies that g >= 0 for f-s to be real. This is implemented below.
         f_s = 2.0 * g ** (3.0/2.0) if g > 0 else 0.0
         f = f_g + f_s
-        return f
+
+        # Calculating the prime components for further use
+        # f_g, f_s, y are to be returned for jacobian calculation
+        fg_prime = a1 + 2.0 * a2 * y + 3.0 * a3 * y**2
+        fg_double_prime = 2.0 * a2 + 6.0 * a3 * y
+        fs_prime = 0.0 # Placeholder
+        fs_double_prime = 0.0 # Placeholder
+
+        return f, f_g, f_s, y, fg_prime, fg_double_prime, fs_prime, fs_double_prime
+
 
     def getDepartureFunctions(self, moles_array, V, T):
         
@@ -292,7 +304,7 @@ class EquationStateJCZ3(EquationState):
 
     def getDepartureJacobian(self,moles_array,V,T):
         # Calculate the Jacobian, which is the matrix of interactions across species. This is indexed by the species i and j
-        # The Jacobian is the hessian of the excess free energy, for the non-ideal chemical potential with respect to species moles.
+        # The Jacobian is the Hessian of the excess free energy, for the non-ideal chemical potential with respect to species moles.
         # This returns a dense NS x NS array
 
         n_g = np.sum(moles_array)
@@ -307,20 +319,79 @@ class EquationStateJCZ3(EquationState):
         RT = self.R0 * T
 
         # TODO: Implement the cross derivatives, which involves differentiating the terms in getDepartureFunctions()
-        fg = 0 # Placeholder
-        fs = 0 # Placeholder
-        f_var = fg + fs
-        dfg_dni = 0 # Placeholder
-        dfs_dni = 0 # Placeholder
-        dfg_dnj = 0 # Placeholder
-        dfs_dnj = 0 # Placeholder
-        d2fg_dni_dnj = 0 # Placeholder
-        d2fs_dni_dnj = 0 # Placeholder
+        # Getting the mixture parameters first
+
+        '''
+        # Possible Code Improvement
+        # 2. Get the 1D arrays for the first derivatives of e0 and Vstar (size: num_species)
+        # This helper function naturally handles the equation from your image!
+        d_e0_dn, d_Vstar_dn = self._get_composition_derivatives(moles_array)
+        # 3. Calculate the 1D array of dy_dn for all species at once (size: num_species)
+        dy_dn = (y / n_g) * ( (n_g / V_star) * d_Vstar_dn + (3.0 / self.F_therm) * ((n_g / e_0) * d_e0_dn - 1.0) )
+        An additional refactor into vectorized operations can be done to improve solver performance.
+        '''
+        i, j = 0, 0 # Placeholder
+        e_0, V_star = self._get_mixture_parameters(moles_array)
+        f_var, f_g, f_s, y, fg_prime, fg_double_prime, fs_prime, fs_double_prime = self._get_f(e_0, V_star, n_g, V, T)
+        d_e0_dn, d_Vstar_dn = self._get_composition_derivatives(moles_array)
+        # Derivatives of y, with respect to n_i and n_j
+        dy_dni = (y / n_g) * ( (n_g / V_star) * d_Vstar_dn[i] + (3.0 / self.F_therm) * ((n_g / e_0) * d_e0_dn[i] - 1.0) )
+        dy_dnj = (y / n_g) * ( (n_g / V_star) * d_Vstar_dn[j] + (3.0 / self.F_therm) * ((n_g / e_0) * d_e0_dn[j] - 1.0) )        
+        
+        d2e0_dni_dnj = 0 # Placeholder
+        d2Vstar_dni_dnj = 0 # Placeholder
+        
+        # Verify
+        # Equation A29 for the second cross-derivative of y
+        term1 = (n_g / y * dy_dni) * (n_g / y * dy_dnj)
+        term2 = - (n_g / V_star * d_Vstar_dn[i]) * (n_g / V_star * d_Vstar_dn[j])
+        term3 = (n_g**2 / V_star) * d2Vstar_dni_dnj
+        term4 = - (3.0 / self.F_therm**2) * ( (n_g / e_0 * d_e0_dn[i]) - 1.0 ) * ( (n_g / e_0 * d_e0_dn[j]) - 1.0 )
+        term5 = (3.0 / self.F_therm) * ( (n_g**2 / e_0) * d2e0_dni_dnj - (n_g / e_0 * d_e0_dn[i]) * (n_g / e_0 * d_e0_dn[j]) + 1.0 )
+        d2y_dni_dnj = (y / n_g**2) * (term1 + term2 + term3 + term4 + term5)
+
+        z = self.l * (V_star/V)**(-1.0/3.0)
+        # Protect against ZeroDivisionError when z = 2.0 (where f_s = 0 anyway)
+        if f_s > 1e-32:
+            z1 = (2.0 - z) - (2.0 / (2.0 - z))
+            z2 = (z / 2.0) + (z / (2.0 - z)**2)
+        # The vectorized array for dfs_dn (size: num_species)
+            dfs_dn = (f_s / n_g) * ( -(z1 / 2.0) * (n_g / V_star) * d_Vstar_dn + 1.5 * ((n_g / e_0) * d_e0_dn - 1.0) )
+        else:
+            z1 = 0.0
+            z2 = 0.0
+            dfs_dn = np.zeros(num_species)
+
+        # Verify
+        # Equation for dfg_dni (and by symmetry, dfg_dnj)
+        dfg_dni = (1.0 / n_g) * ( y * fg_prime * (n_g / y) * dy_dni )
+        dfg_dnj = (1.0 / n_g) * ( y * fg_prime * (n_g / y) * dy_dnj )
+
+
+       # Verify
+        if f_s > 1e-32:
+            term1 = (n_g / f_s * dfs_dn[j]) * (n_g / f_s * dfs_dn[i])
+            term2 = -1.5 * ( (n_g / e_0 * d_e0_dn[i]) * (n_g / e_0 * d_e0_dn[j]) - (n_g**2 / e_0) * d2E0_dni_dnj - 1.0 )
+            term3 = z1 * ( (n_g / V_star * d_Vstar_dn[i]) * (n_g / V_star * d_Vstar_dn[j]) - (n_g**2 / V_star) * d2Vstar_dni_dnj )
+            term4 = - (z2 / 3.0) * ( (n_g / V_star * d_Vstar_dn[i]) * (n_g / V_star * d_Vstar_dn[j]) )
+            
+            d2fs_dni_dnj = (f_s / n_g**2) * (term1 + term2 + term3 + term4)
+        else:
+            d2fs_dni_dnj = 0.0
+
         d2E0_dnj_dni = 0 # Placeholder
 
+        d2fg_dni_dnj = (1.0/(n_g**2)) * (
+            (y**2) * fg_double_prime * ((n_g / y) * dy_dni) * ((n_g / y) * dy_dnj) + 
+            y * fg_prime * ((n_g**2) / y) * d2y_dni_dnj
+        )
+
+        
+        
+
         # dI_dni, dI_dnj
-        dI_dni = (1.0 / f_var) * (dfg_dni + dfs_dni)
-        dI_dnj = (1.0 / f_var) * (dfg_dnj + dfs_dnj)
+        dI_dni = (1.0 / f_var) * (dfg_dni + dfs_dn[i])
+        dI_dnj = (1.0 / f_var) * (dfg_dnj + dfs_dn[j])
 
         # d2_I_dni_dnj 
         d2I_dni_dnj = (1.0/(n_g**2))*(-(n_g * dI_dni) * (n_g * dI_dnj) + ((n_g**2) / f_var) * (d2fg_dni_dnj + d2fs_dni_dnj))
