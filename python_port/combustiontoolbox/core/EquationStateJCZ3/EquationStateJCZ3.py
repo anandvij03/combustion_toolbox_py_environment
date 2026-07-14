@@ -389,6 +389,30 @@ class EquationStateJCZ3(EquationState):
         else:
             d2fs_dni_dnj = 0.0
 
+    # Finding the Lattice Terms:
+        # Fixed JCZ3 parameters
+        m = 6.0
+        l = 13.0 # Fixed stiffness due to numerical instabilities.
+        B_m = 14.45392 # Repulsive stiffness.
+        B_l = 13.99166 # Attractive stiffness.
+        
+        # Scaling factor: s = (m*l) / (2*(l-m))
+        s = (l*m)/(2*(l-m)) 
+        
+        # Geometrical volume ratios
+        # Note: Repulsion scales with (V/V*), Attraction scales with (V*/V)
+        vol_ratio_rep = (V / V_star)**(1.0 / 3.0)
+        vol_ratio_att = (V_star / V)**(m/3.0)
+        
+        # Compute individual branch forces
+        r_l = (B_l/l) * np.exp(l * (1.0 - vol_ratio_rep))
+        r_m = (B_m/m) * vol_ratio_att
+        
+        # Assembly
+        Z = s * (r_l - r_m)
+
+        dZ_dVstar = s/ (3.0 * V_star) * (r_l * z - r_m * m)
+        d2Z_dVstar = 0 # Placeholder
         d2E0_dnj_dni = 0 # Placeholder
 
         d2fg_dni_dnj = (1.0/(n_g**2)) * (
