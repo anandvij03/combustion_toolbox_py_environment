@@ -338,8 +338,18 @@ class EquationStateJCZ3(EquationState):
         dy_dni = (y / n_g) * ( (n_g / V_star) * d_Vstar_dn[i] + (3.0 / self.F_therm) * ((n_g / e_0) * d_e0_dn[i] - 1.0) )
         dy_dnj = (y / n_g) * ( (n_g / V_star) * d_Vstar_dn[j] + (3.0 / self.F_therm) * ((n_g / e_0) * d_e0_dn[j] - 1.0) )        
         
-        d2e0_dni_dnj = 0 # Placeholder
-        d2Vstar_dni_dnj = 0 # Placeholder
+        # Verify
+        # Second cross-derivatives for the mixture rules e_0 and V_star
+        e_ij = self.e_ij[i, j] 
+        term1_e0 = (2.0 * n_g * e_ij) / e_0
+        term2_e0 = - (n_g / e_0) * d_e0_dn[i]
+        term3_e0 = - (n_g / e_0) * d_e0_dn[j]
+        d2e0_dni_dnj = (e_0 / n_g**2) * (term1_e0 + term2_e0 + term3_e0)
+        vstar_ij = self.v_star_ij[i, j]
+        term1_vstar = (2.0 * n_g * vstar_ij) / V_star
+        term2_vstar = - (n_g / V_star) * d_Vstar_dn[i]
+        term3_vstar = - (n_g / V_star) * d_Vstar_dn[j]
+        d2Vstar_dni_dnj = (V_star / n_g**2) * (term1_vstar + term2_vstar + term3_vstar)
         
         # Verify
         # Equation A29 for the second cross-derivative of y
