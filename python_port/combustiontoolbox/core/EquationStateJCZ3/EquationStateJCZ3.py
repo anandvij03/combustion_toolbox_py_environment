@@ -200,7 +200,7 @@ class EquationStateJCZ3(EquationState):
         a1, a2, a3 = 2.96192, 7.12865, 12.4511
         l, m, R0 = self.l, self.m, self.R0
         z = l * (V_star/V)**(-1.0/3.0)
-        c1 = self.c - self.l
+        c1 = self.c + self.l
 
         if n_g <= 1e-16 or e_0 <= 0:
             return 1.0  # Ideal-Gas fallback. This implies there will be no excess contribution.
@@ -225,48 +225,6 @@ class EquationStateJCZ3(EquationState):
         return f, f_g, f_s, y, fg_prime, fg_double_prime, fs_prime, fs_double_prime
 
 
-    def getDepartureFunctions(self, moles_array, V, T):
-        
-        #Calculates the excess chemical potential array (mu_k^excess) for all species.
-        #Returns a NumPy array of size (num_species,).
-        
-        n_g = np.sum(moles_array)
-        if n_g <= 1e-16:
-            return np.zeros_like(moles_array)
-
-        #1. Base Parameters & Gradients
-        e_0, V_star = self._get_mixture_parameters(moles_array)
-        d_e0_dnk, d_Vstar_dnk = self._get_composition_derivatives(moles_array)
-
-        #2. Lattice Energy Derivatives (Analytical)
-        # Remember to apply the extensive n_g * R0 scale here just like in _get_E0
-        dE0_de0, dE0_dVstar = self._get_E0_param_derivatives(e_0, V_star, V, n_g)
-
-        #3. Thermal Function Derivatives (Numerical Wrappers)
-        f_val = self._get_f(e_0, V_star, n_g, V, T)
-        f_e0 = self._get_df_de0(e_0, V_star, n_g, V, T)
-        f_Vstar = self._get_df_dVstar(e_0, V_star, n_g, V, T)
-
-        #4. Master Assembly (The Chain Rule)
-        RT = self.R0 * T
-        nRT_over_f = (n_g * RT) / f_val
-        
-        # e_0 branch
-        bracket_e0 = dE0_de0 + (nRT_over_f * f_e0)
-        term_e0 = bracket_e0 * d_e0_dnk
-        
-        # V* branch
-        bracket_Vstar = dE0_dVstar + (nRT_over_f * f_Vstar)
-        term_Vstar = bracket_Vstar * d_Vstar_dnk
-        
-        # Base thermal log
-        term_thermal_base = RT * np.log(f_val)
-
-        # Final array
-        mu_excess = term_e0 + term_Vstar + term_thermal_base
-        
-        return mu_excess
-
     def _get_P0(self, E_0, e_0, V_star, V):
         # This is a function to get the Lattice Pressure value for the given equation and state parameters. This allows to do two things:
         # 1. The Lattice Pressure is required for calculating the excess chemical potential (due to non-ideal behaviour, modelled by the JCZ3 equation).
@@ -277,9 +235,9 @@ class EquationStateJCZ3(EquationState):
         dV = max(1e-6 * abs(V), 1e-12)
         E0_plus  = self._get_E0(e_0, V_star, V + dV)
         E0_minus = self._get_E0(e_0, V_star, V - dV)
+        
         return -(E0_plus - E0_minus) / (2.0 * dV)
 
-        return True
 
 
     def getDepartureFunctions(self, moles_array, V, T):
@@ -381,7 +339,7 @@ class EquationStateJCZ3(EquationState):
        # Verify
         if f_s > 1e-32:
             term1 = (n_g / f_s * dfs_dn[j]) * (n_g / f_s * dfs_dn[i])
-            term2 = -1.5 * ( (n_g / e_0 * d_e0_dn[i]) * (n_g / e_0 * d_e0_dn[j]) - (n_g**2 / e_0) * d2E0_dni_dnj - 1.0 )
+            term2 = -1.5 * ( (n_g / e_0 * d_e0_dn[i]) * (n_g / e_0 * d_e0_dn[j]) - (n_g**2 / e_0) * d2e0_dni_dnj - 1.0 )
             term3 = z1 * ( (n_g / V_star * d_Vstar_dn[i]) * (n_g / V_star * d_Vstar_dn[j]) - (n_g**2 / V_star) * d2Vstar_dni_dnj )
             term4 = - (z2 / 3.0) * ( (n_g / V_star * d_Vstar_dn[i]) * (n_g / V_star * d_Vstar_dn[j]) )
             
@@ -412,8 +370,19 @@ class EquationStateJCZ3(EquationState):
         Z = s * (r_l - r_m)
 
         dZ_dVstar = s/ (3.0 * V_star) * (r_l * z - r_m * m)
-        d2Z_dVstar = 0 # Placeholder
-        d2E0_dnj_dni = 0 # Placeholder
+        d2Z_dV2 = 0 # Placeholder
+        
+        # Verify
+        term1 = (e_0 / (n_g * V)) * ((n_g**2 / e_0) * d2e0_dni_dnj * Z + 
+        (V_star**2) * d2Z_dV2 * (n_g / V_star * d_Vstar_dn[i]) * (n_g / V_star * d_Vstar_dn[j]))
+        
+        term2 = (e_0 * V_star / (n_g * V)) * dZ_dVstar * (
+        (n_g**2 / V_star) * d2Vstar_dni_dnj + 
+        (n_g / e_0 * d_e0_dn[j]) * (n_g / V_star * d_Vstar_dn[i]) + 
+        (n_g / e_0 * d_e0_dn[i]) * (n_g / V_star * d_Vstar_dn[j]))
+        
+        d2E0_dnj_dni =  term1 + term2
+
 
         d2fg_dni_dnj = (1.0/(n_g**2)) * (
             (y**2) * fg_double_prime * ((n_g / y) * dy_dni) * ((n_g / y) * dy_dnj) + 
