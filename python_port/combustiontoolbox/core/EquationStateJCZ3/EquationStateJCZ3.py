@@ -130,6 +130,28 @@ class EquationStateJCZ3(EquationState):
         d_Vstar_dnk = 2.0 * vstar_bar - (V_star/n_g)
     
         return d_e0_dnk, d_Vstar_dnk
+    
+    '''
+    # Possible when we implement analytical approaches for this.
+    def _get_P0(self, e_0, V_star, V):
+        # Calculates the analytical Lattice Pressure P0 = -dE0/dV
+        m = 6.0
+        l = 13.0
+        B_m = 14.45392
+        B_l = 13.99166
+        s_scale = (l*m)/(2*(l-m))
+        
+        vol_ratio_rep = (V / V_star)**(1.0 / 3.0)
+        vol_ratio_att = (V_star / V)**(m/3.0)
+        
+        r_l = (B_l/l) * np.exp(l * (1.0 - vol_ratio_rep))
+        r_m = (B_m/m) * vol_ratio_att
+        
+        z_lattice = l * vol_ratio_rep
+        
+        P0 = e_0 * (s_scale / (3.0 * V)) * (r_l * z_lattice - r_m * m)
+        return P0
+    '''
 
     # Update Numerical Differentiation to Analytical Differentiation
     def _get_df_de0(self, e_0, V_star, n_g, V, T, de=None):
@@ -204,7 +226,7 @@ class EquationStateJCZ3(EquationState):
 
         if n_g <= 1e-16 or e_0 <= 0:
             return 1.0  # Ideal-Gas fallback. This implies there will be no excess contribution.
-
+                        # Check for Tuple Related Crash Here
 
         self.F_therm = c1 - np.log(T * (l - m) / (m * (e_0 / (n_g * R0))))
         y = (V_star/V) * (self.F_therm / l) ** 3
