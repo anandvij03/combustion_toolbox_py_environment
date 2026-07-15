@@ -310,134 +310,137 @@ class EquationStateJCZ3(EquationState):
         dy_dn = (y / n_g) * ( (n_g / V_star) * d_Vstar_dn + (3.0 / self.F_therm) * ((n_g / e_0) * d_e0_dn - 1.0) )
         An additional refactor into vectorized operations can be done to improve solver performance.
         '''
-        i, j = 0, 0 # Placeholder
+        
         e_0, V_star = self._get_mixture_parameters(moles_array)
         f_var, f_g, f_s, y, fg_prime, fg_double_prime, fs_prime, fs_double_prime = self._get_f(e_0, V_star, n_g, V, T)
         d_e0_dn, d_Vstar_dn = self._get_composition_derivatives(moles_array)
         # Derivatives of y, with respect to n_i and n_j
-        dy_dni = (y / n_g) * ( (n_g / V_star) * d_Vstar_dn[i] + (3.0 / self.F_therm) * ((n_g / e_0) * d_e0_dn[i] - 1.0) )
-        dy_dnj = (y / n_g) * ( (n_g / V_star) * d_Vstar_dn[j] + (3.0 / self.F_therm) * ((n_g / e_0) * d_e0_dn[j] - 1.0) )        
-        
-        # Verify
-        # Second cross-derivatives for the mixture rules e_0 and V_star
-        e_ij = self.e_ij[i, j] 
-        term1_e0 = (2.0 * n_g * e_ij) / e_0
-        term2_e0 = - (n_g / e_0) * d_e0_dn[i]
-        term3_e0 = - (n_g / e_0) * d_e0_dn[j]
-        d2e0_dni_dnj = (e_0 / n_g**2) * (term1_e0 + term2_e0 + term3_e0)
-        vstar_ij = self.v_star_ij[i, j]
-        term1_vstar = (2.0 * n_g * vstar_ij) / V_star
-        term2_vstar = - (n_g / V_star) * d_Vstar_dn[i]
-        term3_vstar = - (n_g / V_star) * d_Vstar_dn[j]
-        d2Vstar_dni_dnj = (V_star / n_g**2) * (term1_vstar + term2_vstar + term3_vstar)
-        
-        # Verify
-        # Equation A29 for the second cross-derivative of y
-        term1 = (n_g / y * dy_dni) * (n_g / y * dy_dnj)
-        term2 = - (n_g / V_star * d_Vstar_dn[i]) * (n_g / V_star * d_Vstar_dn[j])
-        term3 = (n_g**2 / V_star) * d2Vstar_dni_dnj
-        term4 = - (3.0 / self.F_therm**2) * ( (n_g / e_0 * d_e0_dn[i]) - 1.0 ) * ( (n_g / e_0 * d_e0_dn[j]) - 1.0 )
-        term5 = (3.0 / self.F_therm) * ( (n_g**2 / e_0) * d2e0_dni_dnj - (n_g / e_0 * d_e0_dn[i]) * (n_g / e_0 * d_e0_dn[j]) + 1.0 )
-        d2y_dni_dnj = (y / n_g**2) * (term1 + term2 + term3 + term4 + term5)
 
-        z = self.l * (V_star/V)**(-1.0/3.0)
-        # Protect against ZeroDivisionError when z = 2.0 (where f_s = 0 anyway)
-        if f_s > 1e-32:
-            z1 = (2.0 - z) - (2.0 / (2.0 - z))
-            z2 = (z / 2.0) + (z / (2.0 - z)**2)
-        # The vectorized array for dfs_dn (size: num_species)
-            dfs_dn = (f_s / n_g) * ( -(z1 / 2.0) * (n_g / V_star) * d_Vstar_dn + 1.5 * ((n_g / e_0) * d_e0_dn - 1.0) )
-        else:
-            z1 = 0.0
-            z2 = 0.0
-            dfs_dn = np.zeros(num_species)
+        for i in range(num_species):
+            for j in range(num_species):
+                dy_dni = (y / n_g) * ( (n_g / V_star) * d_Vstar_dn[i] + (3.0 / self.F_therm) * ((n_g / e_0) * d_e0_dn[i] - 1.0) )
+                dy_dnj = (y / n_g) * ( (n_g / V_star) * d_Vstar_dn[j] + (3.0 / self.F_therm) * ((n_g / e_0) * d_e0_dn[j] - 1.0) )        
+                
+                # Verify
+                # Second cross-derivatives for the mixture rules e_0 and V_star
+                e_ij = self.e_ij[i, j] 
+                term1_e0 = (2.0 * n_g * e_ij) / e_0
+                term2_e0 = - (n_g / e_0) * d_e0_dn[i]
+                term3_e0 = - (n_g / e_0) * d_e0_dn[j]
+                d2e0_dni_dnj = (e_0 / n_g**2) * (term1_e0 + term2_e0 + term3_e0)
+                vstar_ij = self.v_star_ij[i, j]
+                term1_vstar = (2.0 * n_g * vstar_ij) / V_star
+                term2_vstar = - (n_g / V_star) * d_Vstar_dn[i]
+                term3_vstar = - (n_g / V_star) * d_Vstar_dn[j]
+                d2Vstar_dni_dnj = (V_star / n_g**2) * (term1_vstar + term2_vstar + term3_vstar)
+                
+                # Verify
+                # Equation A29 for the second cross-derivative of y
+                term1 = (n_g / y * dy_dni) * (n_g / y * dy_dnj)
+                term2 = - (n_g / V_star * d_Vstar_dn[i]) * (n_g / V_star * d_Vstar_dn[j])
+                term3 = (n_g**2 / V_star) * d2Vstar_dni_dnj
+                term4 = - (3.0 / self.F_therm**2) * ( (n_g / e_0 * d_e0_dn[i]) - 1.0 ) * ( (n_g / e_0 * d_e0_dn[j]) - 1.0 )
+                term5 = (3.0 / self.F_therm) * ( (n_g**2 / e_0) * d2e0_dni_dnj - (n_g / e_0 * d_e0_dn[i]) * (n_g / e_0 * d_e0_dn[j]) + 1.0 )
+                d2y_dni_dnj = (y / n_g**2) * (term1 + term2 + term3 + term4 + term5)
 
-        # Verify
-        # Equation for dfg_dni (and by symmetry, dfg_dnj)
-        dfg_dni = (1.0 / n_g) * ( y * fg_prime * (n_g / y) * dy_dni )
-        dfg_dnj = (1.0 / n_g) * ( y * fg_prime * (n_g / y) * dy_dnj )
+                z = self.l * (V_star/V)**(-1.0/3.0)
+                # Protect against ZeroDivisionError when z = 2.0 (where f_s = 0 anyway)
+                if f_s > 1e-32:
+                    z1 = (2.0 - z) - (2.0 / (2.0 - z))
+                    z2 = (z / 2.0) + (z / (2.0 - z)**2)
+                # The vectorized array for dfs_dn (size: num_species)
+                    dfs_dn = (f_s / n_g) * ( -(z1 / 2.0) * (n_g / V_star) * d_Vstar_dn + 1.5 * ((n_g / e_0) * d_e0_dn - 1.0) )
+                else:
+                    z1 = 0.0
+                    z2 = 0.0
+                    dfs_dn = np.zeros(num_species)
 
-
-       # Verify
-        if f_s > 1e-32:
-            term1 = (n_g / f_s * dfs_dn[j]) * (n_g / f_s * dfs_dn[i])
-            term2 = -1.5 * ( (n_g / e_0 * d_e0_dn[i]) * (n_g / e_0 * d_e0_dn[j]) - (n_g**2 / e_0) * d2e0_dni_dnj - 1.0 )
-            term3 = z1 * ( (n_g / V_star * d_Vstar_dn[i]) * (n_g / V_star * d_Vstar_dn[j]) - (n_g**2 / V_star) * d2Vstar_dni_dnj )
-            term4 = - (z2 / 3.0) * ( (n_g / V_star * d_Vstar_dn[i]) * (n_g / V_star * d_Vstar_dn[j]) )
-            
-            d2fs_dni_dnj = (f_s / n_g**2) * (term1 + term2 + term3 + term4)
-        else:
-            d2fs_dni_dnj = 0.0
-
-    # Finding the Lattice Terms:
-        # Fixed JCZ3 parameters
-        m = 6.0
-        l = 13.0 # Fixed stiffness due to numerical instabilities.
-        B_m = 14.45392 # Repulsive stiffness.
-        B_l = 13.99166 # Attractive stiffness.
-        
-        # Scaling factor: s = (m*l) / (2*(l-m))
-        s = (l*m)/(2*(l-m)) 
-        
-        # Geometrical volume ratios
-        # Note: Repulsion scales with (V/V*), Attraction scales with (V*/V)
-        vol_ratio_rep = (V / V_star)**(1.0 / 3.0)
-        vol_ratio_att = (V_star / V)**(m/3.0)
-        
-        # Compute individual branch forces
-        r_l = (B_l/l) * np.exp(l * (1.0 - vol_ratio_rep))
-        r_m = (B_m/m) * vol_ratio_att
-        
-        # Assembly
-        Z = s * (r_l - r_m)
-
-        dZ_dVstar = s/ (3.0 * V_star) * (r_l * z - r_m * m)
-        d2Z_dV_star2 = s/ (9.0 * (V_star**2)) * (r_l * z * (z - 4) - r_m * m * (m - 3))
-        
-        # Verify
-        term1 = (e_0 / (n_g * RT)) * (
-            (n_g**2 / e_0) * d2e0_dni_dnj * Z + 
-            (V_star**2) * d2Z_dV_star2 * (n_g / V_star * d_Vstar_dn[i]) * (n_g / V_star * d_Vstar_dn[j])
-        )
-        term2 = (e_0 * V_star / (n_g * RT)) * dZ_dVstar * (
-            (n_g**2 / V_star) * d2Vstar_dni_dnj + 
-            (n_g / e_0 * d_e0_dn[j]) * (n_g / V_star * d_Vstar_dn[i]) + 
-            (n_g / e_0 * d_e0_dn[i]) * (n_g / V_star * d_Vstar_dn[j])
-        )
-        
-        d2E0_dnj_dni = (term1 + term2)* (RT/ (n_g ** 2))
+                # Verify
+                # Equation for dfg_dni (and by symmetry, dfg_dnj)
+                dfg_dni = (1.0 / n_g) * ( y * fg_prime * (n_g / y) * dy_dni )
+                dfg_dnj = (1.0 / n_g) * ( y * fg_prime * (n_g / y) * dy_dnj )
 
 
-        d2fg_dni_dnj = (1.0/(n_g**2)) * (
-            (y**2) * fg_double_prime * ((n_g / y) * dy_dni) * ((n_g / y) * dy_dnj) + 
-            y * fg_prime * ((n_g**2) / y) * d2y_dni_dnj
-        )
+            # Verify
+                if f_s > 1e-32:
+                    term1 = (n_g / f_s * dfs_dn[j]) * (n_g / f_s * dfs_dn[i])
+                    term2 = -1.5 * ( (n_g / e_0 * d_e0_dn[i]) * (n_g / e_0 * d_e0_dn[j]) - (n_g**2 / e_0) * d2e0_dni_dnj - 1.0 )
+                    term3 = z1 * ( (n_g / V_star * d_Vstar_dn[i]) * (n_g / V_star * d_Vstar_dn[j]) - (n_g**2 / V_star) * d2Vstar_dni_dnj )
+                    term4 = - (z2 / 3.0) * ( (n_g / V_star * d_Vstar_dn[i]) * (n_g / V_star * d_Vstar_dn[j]) )
+                    
+                    d2fs_dni_dnj = (f_s / n_g**2) * (term1 + term2 + term3 + term4)
+                else:
+                    d2fs_dni_dnj = 0.0
 
-        
-        
+            # Finding the Lattice Terms:
+                # Fixed JCZ3 parameters
+                m = 6.0
+                l = 13.0 # Fixed stiffness due to numerical instabilities.
+                B_m = 14.45392 # Repulsive stiffness.
+                B_l = 13.99166 # Attractive stiffness.
+                
+                # Scaling factor: s = (m*l) / (2*(l-m))
+                s = (l*m)/(2*(l-m)) 
+                
+                # Geometrical volume ratios
+                # Note: Repulsion scales with (V/V*), Attraction scales with (V*/V)
+                vol_ratio_rep = (V / V_star)**(1.0 / 3.0)
+                vol_ratio_att = (V_star / V)**(m/3.0)
+                
+                # Compute individual branch forces
+                r_l = (B_l/l) * np.exp(l * (1.0 - vol_ratio_rep))
+                r_m = (B_m/m) * vol_ratio_att
+                
+                # Assembly
+                Z = s * (r_l - r_m)
 
-        # dI_dni, dI_dnj
-        dI_dni = (1.0 / f_var) * (dfg_dni + dfs_dn[i])
-        dI_dnj = (1.0 / f_var) * (dfg_dnj + dfs_dn[j])
+                dZ_dVstar = s/ (3.0 * V_star) * (r_l * z - r_m * m)
+                d2Z_dV_star2 = s/ (9.0 * (V_star**2)) * (r_l * z * (z - 4) - r_m * m * (m - 3))
+                
+                # Verify
+                term1 = (e_0 / (n_g * RT)) * (
+                    (n_g**2 / e_0) * d2e0_dni_dnj * Z + 
+                    (V_star**2) * d2Z_dV_star2 * (n_g / V_star * d_Vstar_dn[i]) * (n_g / V_star * d_Vstar_dn[j])
+                )
+                term2 = (e_0 * V_star / (n_g * RT)) * dZ_dVstar * (
+                    (n_g**2 / V_star) * d2Vstar_dni_dnj + 
+                    (n_g / e_0 * d_e0_dn[j]) * (n_g / V_star * d_Vstar_dn[i]) + 
+                    (n_g / e_0 * d_e0_dn[i]) * (n_g / V_star * d_Vstar_dn[j])
+                )
+                
+                d2E0_dnj_dni = (term1 + term2)* (RT/ (n_g ** 2))
 
-        # d2_I_dni_dnj 
-        d2I_dni_dnj = (1.0/(n_g**2))*(-(n_g * dI_dni) * (n_g * dI_dnj) + ((n_g**2) / f_var) * (d2fg_dni_dnj + d2fs_dni_dnj))
-        
+
+                d2fg_dni_dnj = (1.0/(n_g**2)) * (
+                    (y**2) * fg_double_prime * ((n_g / y) * dy_dni) * ((n_g / y) * dy_dnj) + 
+                    y * fg_prime * ((n_g**2) / y) * d2y_dni_dnj
+                )
+
+                
+                
+
+                # dI_dni, dI_dnj
+                dI_dni = (1.0 / f_var) * (dfg_dni + dfs_dn[i])
+                dI_dnj = (1.0 / f_var) * (dfg_dnj + dfs_dn[j])
+
+                # d2_I_dni_dnj 
+                d2I_dni_dnj = (1.0/(n_g**2))*(-(n_g * dI_dni) * (n_g * dI_dnj) + ((n_g**2) / f_var) * (d2fg_dni_dnj + d2fs_dni_dnj))
+                
 
 
-        # Equation (A68) dGamma_dln_nj
-        # Gamma = mu_excess/RT (the imperfection factor)
-        # I = ln(f), and f = f_s + f_g
-        # Typographical error in the overall structure of the matrix. Apparently it is not dGamma_i_dln_nj, as shown in the 
-        # JCZ3 manual, but rather dGamma_i_dnj, which seems to be the partial derivative obtained upon differentiation (checked).
-        dGamma_i_dnj = (1.0 / n_g) * (
-            (n_g / RT) * d2E0_dnj_dni + 
-            n_g * dI_dni + 
-            n_g * dI_dnj + 
-            (n_g**2) * d2I_dni_dnj
-        )
+                # Equation (A68) dGamma_dln_nj
+                # Gamma = mu_excess/RT (the imperfection factor)
+                # I = ln(f), and f = f_s + f_g
+                # Typographical error in the overall structure of the matrix. Apparently it is not dGamma_i_dln_nj, as shown in the 
+                # JCZ3 manual, but rather dGamma_i_dnj, which seems to be the partial derivative obtained upon differentiation (checked).
+                dGamma_i_dnj = (1.0 / n_g) * (
+                    (n_g / RT) * d2E0_dnj_dni + 
+                    n_g * dI_dni + 
+                    n_g * dI_dnj + 
+                    (n_g**2) * d2I_dni_dnj
+                )
 
-        J_excess[i, j] = dGamma_i_dnj
+                J_excess[i, j] = dGamma_i_dnj
 
         return J_excess
 
