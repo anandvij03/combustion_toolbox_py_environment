@@ -392,18 +392,20 @@ class EquationStateJCZ3(EquationState):
         Z = s * (r_l - r_m)
 
         dZ_dVstar = s/ (3.0 * V_star) * (r_l * z - r_m * m)
-        d2Z_dV2 = 0 # Placeholder
+        d2Z_dV_star2 = s/ (9.0 * (V_star**2)) * (r_l * z * (z - 4) - r_m * m * (m - 3))
         
         # Verify
-        term1 = (e_0 / (n_g * V)) * ((n_g**2 / e_0) * d2e0_dni_dnj * Z + 
-        (V_star**2) * d2Z_dV2 * (n_g / V_star * d_Vstar_dn[i]) * (n_g / V_star * d_Vstar_dn[j]))
+        term1 = (e_0 / (n_g * RT)) * (
+            (n_g**2 / e_0) * d2e0_dni_dnj * Z + 
+            (V_star**2) * d2Z_dV_star2 * (n_g / V_star * d_Vstar_dn[i]) * (n_g / V_star * d_Vstar_dn[j])
+        )
+        term2 = (e_0 * V_star / (n_g * RT)) * dZ_dVstar * (
+            (n_g**2 / V_star) * d2Vstar_dni_dnj + 
+            (n_g / e_0 * d_e0_dn[j]) * (n_g / V_star * d_Vstar_dn[i]) + 
+            (n_g / e_0 * d_e0_dn[i]) * (n_g / V_star * d_Vstar_dn[j])
+        )
         
-        term2 = (e_0 * V_star / (n_g * V)) * dZ_dVstar * (
-        (n_g**2 / V_star) * d2Vstar_dni_dnj + 
-        (n_g / e_0 * d_e0_dn[j]) * (n_g / V_star * d_Vstar_dn[i]) + 
-        (n_g / e_0 * d_e0_dn[i]) * (n_g / V_star * d_Vstar_dn[j]))
-        
-        d2E0_dnj_dni =  term1 + term2
+        d2E0_dnj_dni = (term1 + term2)* (RT/ (n_g ** 2))
 
 
         d2fg_dni_dnj = (1.0/(n_g**2)) * (
@@ -426,13 +428,16 @@ class EquationStateJCZ3(EquationState):
         # Equation (A68) dGamma_dln_nj
         # Gamma = mu_excess/RT (the imperfection factor)
         # I = ln(f), and f = f_s + f_g
-        dGamma_i_dln_nj = (1.0 / n_g) * (
+        # Typographical error in the overall structure of the matrix. Apparently it is not dGamma_i_dln_nj, as shown in the 
+        # JCZ3 manual, but rather dGamma_i_dnj, which seems to be the partial derivative obtained upon differentiation (checked).
+        dGamma_i_dnj = (1.0 / n_g) * (
             (n_g / RT) * d2E0_dnj_dni + 
             n_g * dI_dni + 
             n_g * dI_dnj + 
             (n_g**2) * d2I_dni_dnj
         )
 
+        J_excess[i, j] = dGamma_i_dnj
 
         return J_excess
 
