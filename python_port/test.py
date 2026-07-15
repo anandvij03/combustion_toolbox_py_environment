@@ -1,45 +1,17 @@
-# -------------------------------------------------------------------------
-# EXAMPLE: EV
-#
-# Compute equilibrium composition at adiabatic temperature and defined
-# specific volume v = 1 m3/kg for lean to rich CH4-air mixtures at temperature 
-# T = 300 K, and a set of equivalence ratios (phi) contained in (0.5, 5) [-]
-#   
-# See wiki or setListspecies method from ChemicalSystem class for predefined
-# sets of species
-# @author: Anand V
-# @adapted-from: Alberto Cuadra Lara 
-#                 
-# Last update June 2026
-# -------------------------------------------------------------------------
-
-# Import packages
 import numpy as np
-from combustiontoolbox.databases.NasaDatabase.NasaDatabase import NasaDatabase
-from combustiontoolbox.core import *
-from combustiontoolbox.equilibrium import *
+from combustiontoolbox.core.EquationStateJCZ3.EquationStateJCZ3 import EquationStateJCZ3
 
-# Get Nasa database
-DB = NasaDatabase()
+# Define species and properties
+species_names = ['N2', 'O2']
+index_condensed = []
+moles = np.array([0.5, 0.5])
+V = 1.0
+T = 300.0
 
-# Define chemical system
-system = ChemicalSystem(DB)
+# Initialize EOS and compute Jacobian
+eos = EquationStateJCZ3(species_names, index_condensed)
+J = eos.getDepartureJacobian(moles, V, T)
 
-# Initialize mixture
-mix = Mixture(system)
-
-# Define chemical state
-mix.set(['CH4'], 'fuel', 1)
-mix.set(['N2', 'O2', 'Ar', 'CO2'], 'oxidizer', np.array([78.084, 20.9476, 0.9365, 0.0319]) / 20.9476)
-
-# Define properties
-mixArray = mix.setProperties('temperature', 300, 'volume', 1, 'equivalenceRatio', np.arange(0.5, 5.01, 0.01))
-
-# Initialize solver
-solver = EquilibriumSolver(problemType='EV')
-
-# Solve the problem
-solver.solveArray(mixArray)
-
-# Generate report
-solver.report(mixArray)
+print("Jacobian:")
+print(J)
+print("\nSymmetric?", np.allclose(J, J.T))
