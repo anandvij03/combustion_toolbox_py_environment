@@ -129,6 +129,7 @@ def equilibriumHelmholtz(self, system, productSpeciesSet, v, T, mix, molesGuess)
             #ADDED CODE
             # 2. Non-Ideal (Excess) contribution via toggle. This can be switched off for convenience.
             FLAG_JCZ3 = True
+            J_excess = None
             if FLAG_JCZ3 == True:
                 # To be Removed: This has to be replaced with instantiation in the example file itself.
                 # Get the exact names of the active products in the correct order
@@ -137,15 +138,16 @@ def equilibriumHelmholtz(self, system, productSpeciesSet, v, T, mix, molesGuess)
                 # Excess Chemical Potential (mu_excess)
                 mu_excess = jcz3_model.getDepartureFunctions(N,v,T)
                 muRT[indexGas] += mu_excess[indexGas]/ RT
+                J_excess = jcz3_model.getDepartureJacobian(N,v,T)
 
             # Compute total number of moles
             NP = np.sum(N[indexGas])
             
             # Construction of matrix J
-            J = update_matrix_J(A0_T, N, indexGas, indexCondensed, psi_j)
+            J, W = update_matrix_J(A0_T, N, indexGas, indexCondensed, psi_j, J_excess)
             
             # Construction of vector b      
-            b = update_vector_b(A0, N, NatomE, ind_E, index, indexGas, indexCondensed, indexIons, muRT, tau)
+            b = update_vector_b(A0, N, NatomE, ind_E, index, indexGas, indexCondensed, indexIons, muRT, tau, W)
             
             # Solve the linear system J*x = b
             try:
@@ -350,7 +352,14 @@ def equilibriumHelmholtz(self, system, productSpeciesSet, v, T, mix, molesGuess)
     N[indexCondensed_0[mask]] = 0.0
 
     # Update matrix J (jacobian) to compute the thermodynamic derivatives
-    J = update_matrix_J(A0_T, N, indexGas, indexCondensed, psi_j)
+    FLAG_JCZ3 = True
+    J_excess = None
+    if FLAG_JCZ3:
+        jcz3_names = [system.listSpecies[i] for i in productSpeciesSet.indexGlobal]
+        jcz3_model = EquationStateJCZ3(species_names=jcz3_names, index_condensed=indexCondensed)
+        J_excess = jcz3_model.getDepartureJacobian(N, v, T)
+
+    J, W = update_matrix_J(A0_T, N, indexGas, indexCondensed, psi_j, J_excess)
     
     J12_2 = np.concatenate((np.sum(A0_T[:, indexGas] * N[indexGas][np.newaxis, :], axis=1), np.zeros(NS - NG)))
     J = np.vstack((np.hstack((J, J12_2[:, np.newaxis])), np.append(J12_2, 0.0)[np.newaxis, :]))
@@ -385,14 +394,28 @@ def compute_STOP(N_index, deltaN, NG, A0_index, NatomE, max_NatomE, tolE):
     return max(np.max(deltaN1), deltab_max)
 
 
-def update_matrix_J11(A0_T, N, indexGas):
+def update_matrix_J11(A0_T, N, indexGas, J_excess=None):
     # Compute submatrix J11
     A0_T_gas = A0_T[:, indexGas]
     N_gas = N[indexGas]
-    temp = A0_T_gas * N_gas[np.newaxis, :]
-    J11 = A0_T_gas @ temp.T
+    
+    if J_excess is not None:
+        J_excess_gas = J_excess[np.ix_(indexGas, indexGas)]
+        M = np.eye(len(indexGas)) + J_excess_gas * N_gas[np.newaxis, :]
+        try:
+            M_inv = np.linalg.inv(M)
+        except np.linalg.LinAlgError:
+            M_inv = np.linalg.pinv(M)
+        W = np.diag(N_gas) @ M_inv
+        W = (W + W.T) / 2.0
+        J11 = A0_T_gas @ W @ A0_T_gas.T
+    else:
+        temp = A0_T_gas * N_gas[np.newaxis, :]
+        J11 = A0_T_gas @ temp.T
+        W = None
+        
     J11 = (J11 + J11.T) / 2.0
-    return J11
+    return J11, W
 
 
 def update_matrix_J12(A0_T, indexCondensed):
@@ -400,9 +423,9 @@ def update_matrix_J12(A0_T, indexCondensed):
     return A0_T[:, indexCondensed]
 
 
-def update_matrix_J(A0_T, N, indexGas, indexCondensed, psi_j):
+def update_matrix_J(A0_T, N, indexGas, indexCondensed, psi_j, J_excess=None):
     # Compute matrix J
-    J11 = update_matrix_J11(A0_T, N, indexGas)
+    J11, W = update_matrix_J11(A0_T, N, indexGas, J_excess)
     J12 = update_matrix_J12(A0_T, indexCondensed)
     NC = len(indexCondensed)
     if NC > 0:
@@ -413,20 +436,24 @@ def update_matrix_J(A0_T, N, indexGas, indexCondensed, psi_j):
         J = np.vstack((row1, row2))
     else:
         J = J11
-    return J
+    return J, W
 
 
-def update_vector_b(A0, N, NatomE, ind_E, index, indexGas, indexCondensed, indexIons, muRT, tau):
+def update_vector_b(A0, N, NatomE, ind_E, index, indexGas, indexCondensed, indexIons, muRT, tau, W=None):
     # Compute vector b
     bi = N[index] @ A0[index, :]
     if indexIons is not None and len(indexIons) > 0:
         bi[ind_E] = NatomE[ind_E]
     
     A0_gas = A0[indexGas, :]
-    N_gas = N[indexGas]
     muRT_gas = muRT[indexGas]
-    factor = (N_gas * muRT_gas)[:, np.newaxis]
-    sum_part = np.sum(A0_gas * factor, axis=0)
+    
+    if W is not None:
+        sum_part = A0_gas.T @ (W @ muRT_gas)
+    else:
+        N_gas = N[indexGas]
+        factor = (N_gas * muRT_gas)[:, np.newaxis]
+        sum_part = np.sum(A0_gas * factor, axis=0)
 
     b1 = NatomE - bi + sum_part
     b2 = muRT[indexCondensed] - tau / N[indexCondensed]

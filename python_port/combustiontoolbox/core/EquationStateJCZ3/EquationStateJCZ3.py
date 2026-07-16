@@ -461,3 +461,11 @@ class EquationStateJCZ3(EquationState):
     def getTemperature(self, *args, **kwargs):
         raise NotImplementedError("JCZ3 getTemperature not yet implemented.")
 
+'''
+Potential Improvement
+If you use np.sum(moles_array) without masking, you are dividing the gas-phase interactions by the total moles of the system (gas + condensed). 
+As you noted, for PBXN-111, this is a massive error. The equilibrium composition of PBXN-111 detonation products contains substantial amounts 
+of solid graphite and solid aluminum oxide (Al2O3). Because the numerator (the interaction matrices e_ij)
+correctly evaluates to zero for these solids, but your denominator erroneously includes their moles, you were artificially 
+deflating the mole fractions (xi) of the active gases. This would cause the solver to severely underestimate the extreme high-pressure repulsions of the JCZ3 potential.
+ '''
